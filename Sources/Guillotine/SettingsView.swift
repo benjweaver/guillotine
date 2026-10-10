@@ -68,7 +68,7 @@ struct SettingsView: View {
             Divider()
             VStack(alignment: .leading, spacing: 10) {
                 Text("Global disable shortcut").font(.headline)
-                HStack {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 105), alignment: .leading)], alignment: .leading) {
                     ForEach(Shortcut.modifierChoices, id: \.1) { entry in
                         Toggle(entry.0, isOn: Binding(get: { modifiers & entry.1 != 0 }, set: { if $0 { modifiers |= entry.1 } else { modifiers &= ~entry.1 } }))
                             .toggleStyle(.checkbox)
@@ -83,7 +83,7 @@ struct SettingsView: View {
                     Button("Apply") { preferences.changeShortcut(Shortcut(key: key, modifiers: modifiers)) }
                         .disabled(!Shortcut(key: key, modifiers: modifiers).valid)
                 }
-                Text("Choose at least two modifiers, including Control or Command. Key positions use the US layout. Works while another app has focus; Secure Input or a locked screen may block hotkeys.")
+                Text("Choose at least two modifiers, including Control or Command. Key positions use the US layout. Fn requires a keyboard with that key. Works while another app has focus; Secure Input or a locked screen may block hotkeys.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let error = preferences.shortcutError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             }

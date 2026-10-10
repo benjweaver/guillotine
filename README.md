@@ -26,7 +26,7 @@ For distribution, select your Developer ID team, sign, archive and notarize with
 
 1. Connect external power. Full battery or optimized charging still qualifies. Desktop AC qualifies; a UPS running on battery does not.
 2. Click the outlined guillotine in the menu bar → **Enable Headless Mode**. The blade fills and a power dot appears when active. Let the display sleep normally.
-3. Disable from the menu or press **⌃⌥⌘H** while another app has focus. Settings lets you choose modifiers and a key; a conflicting shortcut leaves the old one registered. Secure Input/lock screens may block hotkeys.
+3. Disable from the menu or press **Fn–Control–Option–Command–Space** while another app has focus. Settings lets you choose modifiers and a key; a conflicting shortcut leaves the old one registered. The Fn key is required by default; keyboards without Fn can choose another chord. Secure Input/lock screens may block hotkeys. macOS exclusive registration detects registered conflicts and blocks activation until an available shortcut is chosen. Other utilities or OS gestures may still intercept keys; test delivery with your physical keyboard.
 4. Optionally enable **Launch Guillotine at login** in Settings. It launches disabled. Approve Login Items in System Settings if macOS requests it.
 5. **Quit Guillotine** releases the assertion before exiting. If the app crashes, macOS releases its process-scoped assertion automatically.
 

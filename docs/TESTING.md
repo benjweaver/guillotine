@@ -59,3 +59,11 @@ Record Mac model/chip, macOS version, power adapter, capture host/client version
 ## Limits of the tests
 
 Injected power values validate the state machine, not IOKit's physical notification delivery. Real IOKit tests validate assertion calls, not a full idle interval. The universal build verifies both architectures compile/link, not Intel execution. Helper lease/recovery tests are not applicable because this app has no privileged helper and no persistent power changes. No thermal, closed-lid, minimum-OS, backlight or end-to-end streaming result is implied by the host/VM tests.
+
+## Fn + Space default and resource packaging follow-up
+
+- Default changed to **Fn–Control–Option–Command–Space**. A standalone Carbon probe registered that exact chord exclusively with `noErr` and no registered conflict, then released it. A second probe successfully reserved the Fn and non-Fn variants simultaneously, showing the registrations are distinct.
+- Hotkey registrations now request `kEventHotKeyExclusive`, so conflicts reported by macOS cannot silently share the registered shortcut. Configured shortcuts remain supported; Fn is optional for keyboards without it.
+- Final XCTest run: **16 tests passed, zero failures**, including Fn+Space exclusive conflict and release checks. A first version of the new test collided with the test host's own default registration; the test now uses an independent chord with Shift added. This was a test-fixture conflict, not a production fallback.
+- Corrected XcodeGen resource declarations. Verified the installed signed bundle contains `AppIcon.icns`, `Assets.car`, `HeadlessGuide.txt`, and `LICENSE`. The earlier icon artwork was generated correctly but had been omitted from the app bundle by the build configuration.
+- Verified the installed app UI displays Fn, Control, Option and Command selected, Space as the key, and OFF. Preserved the user's enabled launch-at-login setting. The global shortcut's physical key delivery still needs a real keyboard test.

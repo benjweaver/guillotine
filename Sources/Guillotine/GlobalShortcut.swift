@@ -7,9 +7,9 @@ import Carbon
 struct Shortcut: Equatable {
     var key: UInt32
     var modifiers: UInt32
-    static let standard = Shortcut(key: UInt32(kVK_ANSI_H), modifiers: UInt32(cmdKey | optionKey | controlKey))
+    static let standard = Shortcut(key: UInt32(kVK_Space), modifiers: UInt32(cmdKey | optionKey | controlKey) | UInt32(kEventKeyModifierFnMask))
     static let keys: [(String, UInt32)] = [
-        ("A", 0), ("B", 11), ("C", 8), ("D", 2), ("E", 14), ("F", 3),
+        ("Space", UInt32(kVK_Space)), ("A", 0), ("B", 11), ("C", 8), ("D", 2), ("E", 14), ("F", 3),
         ("G", 5), ("H", 4), ("I", 34), ("J", 38), ("K", 40), ("L", 37),
         ("M", 46), ("N", 45), ("O", 31), ("P", 35), ("Q", 12), ("R", 15),
         ("S", 1), ("T", 17), ("U", 32), ("V", 9), ("W", 13), ("X", 7),
@@ -18,16 +18,16 @@ struct Shortcut: Equatable {
         ("F11", 103), ("F12", 111)
     ]
     static let modifierChoices: [(String, UInt32)] = [
-        ("Control ⌃", UInt32(controlKey)), ("Option ⌥", UInt32(optionKey)),
-        ("Shift ⇧", UInt32(shiftKey)), ("Command ⌘", UInt32(cmdKey))
+        ("Fn 🌐", UInt32(kEventKeyModifierFnMask)), ("Control ⌃", UInt32(controlKey)), ("Option ⌥", UInt32(optionKey)),
+        ("Command ⌘", UInt32(cmdKey)), ("Shift ⇧", UInt32(shiftKey))
     ]
     var valid: Bool {
-        let permitted = UInt32(controlKey | optionKey | shiftKey | cmdKey)
+        let permitted = UInt32(controlKey | optionKey | shiftKey | cmdKey) | UInt32(kEventKeyModifierFnMask)
         return Self.keys.contains { $0.1 == key } && modifiers & ~permitted == 0
             && modifiers.nonzeroBitCount >= 2 && modifiers & UInt32(controlKey | cmdKey) != 0
     }
     var label: String {
-        let symbols: [(UInt32, String)] = [(UInt32(controlKey), "⌃"), (UInt32(optionKey), "⌥"), (UInt32(shiftKey), "⇧"), (UInt32(cmdKey), "⌘")]
+        let symbols: [(UInt32, String)] = [(UInt32(kEventKeyModifierFnMask), "Fn"), (UInt32(controlKey), "⌃"), (UInt32(optionKey), "⌥"), (UInt32(shiftKey), "⇧"), (UInt32(cmdKey), "⌘")]
         return symbols.filter { modifiers & $0.0 != 0 }.map(\.1).joined()
             + (Self.keys.first { $0.1 == key }?.0 ?? "?")
     }
@@ -46,7 +46,7 @@ struct Shortcut: Equatable {
     private var hotKey: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private let action: () -> Void
-    private static let signature: OSType = 0x4E4A4152 // NJAR
+    private static let signature: OSType = 0x4755494C // GUIL
 
     init(action: @escaping () -> Void) { self.action = action }
 
@@ -71,7 +71,7 @@ struct Shortcut: Equatable {
         // Reserve the replacement before releasing the current key. Failed changes leave
         // the existing emergency shortcut intact.
         var replacement: EventHotKeyRef?
-        let result = RegisterEventHotKey(shortcut.key, shortcut.modifiers, EventHotKeyID(signature: Self.signature, id: 1), GetApplicationEventTarget(), 0, &replacement)
+        let result = RegisterEventHotKey(shortcut.key, shortcut.modifiers, EventHotKeyID(signature: Self.signature, id: 1), GetApplicationEventTarget(), OptionBits(kEventHotKeyExclusive), &replacement)
         guard result == noErr else { throw failure(result) }
         if let hotKey { UnregisterEventHotKey(hotKey) }
         hotKey = replacement

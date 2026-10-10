@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0401B89310EB49DE7ADD23A4 /* GuillotineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1F2C7A714AF40C99BA7AFD /* GuillotineApp.swift */; };
+		0CCB0257E2CC6DD921DE1FB3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 886F38EF08BBD5CF4562CE57 /* LICENSE */; };
 		0F8B53AAA0DAB71095F7F3E0 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
 		3FC440EC5C337487FF145BAB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */; };
 		6B7E6898A7A102BC68461647 /* GuillotineGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7299F62E31542C804255DF5A /* GuillotineGlyph.swift */; };
@@ -15,6 +16,8 @@
 		9A2E31910C4E4EBDAD79DCB2 /* PowerAssertion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C8DA3A2A4670ACB001B7C90 /* PowerAssertion.swift */; };
 		A13641DF5883CFDCE5E307A2 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0C3C432C065AE98283A637F /* ServiceManagement.framework */; };
 		A6FE6C2900D1064AF01A1B0B /* SessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA03E68B083F6F263E07E436 /* SessionTests.swift */; };
+		CD6B8305D13AFABFD668614D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BBE538B19CF588F7C1A22C4C /* Assets.xcassets */; };
+		DB08246469F3ADC62AE731AE /* HeadlessGuide.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */; };
 		DCAF6A50DF6B5B80DD8F42EA /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045372880B00E4B6E6F04823 /* GlobalShortcut.swift */; };
 		DF7C07698C2208877AF1820B /* SessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC412360E895079ADA11026 /* SessionController.swift */; };
 		F48B5B620BE44DCF0D41C2B3 /* PowerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB403A034BE910093CE4540 /* PowerMonitor.swift */; };
@@ -32,13 +35,16 @@
 
 /* Begin PBXFileReference section */
 		045372880B00E4B6E6F04823 /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
+		0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = HeadlessGuide.txt; sourceTree = "<group>"; };
 		1AB403A034BE910093CE4540 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
 		488980E09E9EBAE78ED11836 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		6E381EB032717F36B4EFF02C /* Guillotine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Guillotine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7299F62E31542C804255DF5A /* GuillotineGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuillotineGlyph.swift; sourceTree = "<group>"; };
 		807B71214F22929565799208 /* GuillotineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuillotineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		886F38EF08BBD5CF4562CE57 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
 		9C8DA3A2A4670ACB001B7C90 /* PowerAssertion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerAssertion.swift; sourceTree = "<group>"; };
 		BB71D6736DFB938115FE4BBF /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
+		BBE538B19CF588F7C1A22C4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		E0C3C432C065AE98283A637F /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		EA03E68B083F6F263E07E436 /* SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTests.swift; sourceTree = "<group>"; };
@@ -60,6 +66,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		15AF2AD430717B2665EB74ED /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BBE538B19CF588F7C1A22C4C /* Assets.xcassets */,
+				0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		225345C0C5AF08C4DCDF40F0 /* Guillotine */ = {
 			isa = PBXGroup;
 			children = (
@@ -87,8 +102,10 @@
 		850450410AB8E42369FF7A9E = {
 			isa = PBXGroup;
 			children = (
+				886F38EF08BBD5CF4562CE57 /* LICENSE */,
 				225345C0C5AF08C4DCDF40F0 /* Guillotine */,
 				2A582ABAAA6B41E0EE5FDD6D /* GuillotineTests */,
+				15AF2AD430717B2665EB74ED /* Resources */,
 				BB4AC73FAAD919F3E59DCC42 /* Frameworks */,
 				BF7265924B5B7D2F3D8E6101 /* Products */,
 			);
@@ -121,6 +138,7 @@
 			buildConfigurationList = 49BD0B5D4AEA3AE699E081D9 /* Build configuration list for PBXNativeTarget "Guillotine" */;
 			buildPhases = (
 				53824E75DFBDB6CA7D323DFD /* Sources */,
+				8D489FFCD003C6E39A624E08 /* Resources */,
 				EE3BB452E9BE04F5EC8D0C4A /* Frameworks */,
 			);
 			buildRules = (
@@ -188,6 +206,19 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8D489FFCD003C6E39A624E08 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CD6B8305D13AFABFD668614D /* Assets.xcassets in Resources */,
+				DB08246469F3ADC62AE731AE /* HeadlessGuide.txt in Resources */,
+				0CCB0257E2CC6DD921DE1FB3 /* LICENSE in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		53824E75DFBDB6CA7D323DFD /* Sources */ = {
@@ -273,7 +304,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -373,7 +404,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;

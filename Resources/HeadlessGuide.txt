@@ -1,4 +1,4 @@
-NIGHTJAR — AWAKE IN THE DARK
+GUILLOTINE — OFF WITH THE HEAD
 
 Headless Mode prevents idle SYSTEM sleep on external power. It allows the
 physical display to sleep and the keyboard backlight to time out normally.
@@ -45,7 +45,7 @@ Reconnecting power never enables it. Every launch starts disabled, including
 launch at login. macOS automatically releases the assertion after an app crash.
 Disabling does not force sleep or disconnect sessions. macOS resumes policy.
 
-The global disable shortcut defaults to Control-Option-Command-H. Change it
+The global disable shortcut defaults to Fn-Control-Option-Command-Space. Change it
 in Settings. Secure Input or the lock screen can block global hotkeys; do not
 depend on it at the lock screen. No Accessibility permission is needed by
 Guillotine. Backlight timeout is controlled in System Settings; Guillotine has no

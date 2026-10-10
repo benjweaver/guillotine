@@ -145,6 +145,9 @@ import Carbon
     }
     func testShortcutValidationAndPersistence() {
         XCTAssertTrue(Shortcut.standard.valid)
+        XCTAssertEqual(Shortcut.standard.key, UInt32(kVK_Space))
+        XCTAssertEqual(Shortcut.standard.modifiers, UInt32(cmdKey | optionKey | controlKey) | UInt32(kEventKeyModifierFnMask))
+        XCTAssertEqual(Shortcut.standard.label, "Fn⌃⌥⌘Space")
         XCTAssertFalse(Shortcut(key: 4, modifiers: 0).valid)
         XCTAssertFalse(Shortcut(key: 999, modifiers: Shortcut.standard.modifiers).valid)
         let suite = "GuillotineTest-\(UUID().uuidString)"
@@ -177,6 +180,18 @@ import Carbon
         try second.register(one)
         XCTAssertThrowsError(try second.register(two))
     }
+    func testFnSpaceShortcutCanBeReservedExclusively() throws {
+        let first = GlobalShortcut(action: {})
+        let second = GlobalShortcut(action: {})
+        defer { first.stop(); second.stop() }
+        // The test host itself reserves the default. Add Shift for an independent
+        // Fn+Space reservation so this test does not conflict with its own app.
+        let candidate = Shortcut(key: Shortcut.standard.key, modifiers: Shortcut.standard.modifiers | UInt32(shiftKey))
+        try first.register(candidate)
+        XCTAssertThrowsError(try second.register(candidate))
+        first.stop()
+        try second.register(candidate)
+    }
     func testCarbonHotkeyEventDisablesSession() throws {
         let assertion = Assertion()
         let controller = make(assertion)
@@ -188,7 +203,7 @@ import Carbon
         XCTAssertEqual(CreateEvent(nil, OSType(kEventClassKeyboard), UInt32(kEventHotKeyPressed), GetCurrentEventTime(), EventAttributes(kEventAttributeUserEvent), &event), noErr)
         let created = try XCTUnwrap(event)
         defer { ReleaseEvent(created) }
-        var identifier = EventHotKeyID(signature: 0x4E4A4152, id: 1)
+        var identifier = EventHotKeyID(signature: 0x4755494C, id: 1)
         XCTAssertEqual(SetEventParameter(created, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), MemoryLayout<EventHotKeyID>.size, &identifier), noErr)
         XCTAssertEqual(SendEventToEventTarget(created, GetApplicationEventTarget()), noErr)
         XCTAssertFalse(controller.enabled)

@@ -11,13 +11,18 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_APP_SANDBOX: NO
     MARKETING_VERSION: '1.0.0'
-    CURRENT_PROJECT_VERSION: '1'
+    CURRENT_PROJECT_VERSION: '2'
 targets:
   Guillotine:
     type: application
     platform: macOS
-    sources: [Sources/Guillotine]
-    resources: [Resources/Assets.xcassets, Resources/HeadlessGuide.txt, LICENSE]
+    sources:
+      - path: Sources/Guillotine
+      - path: Resources
+        excludes: [Info.plist]
+        buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
     info:
       path: Resources/Info.plist
       properties:

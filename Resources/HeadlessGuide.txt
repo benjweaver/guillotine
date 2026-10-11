@@ -10,6 +10,13 @@ inspected input source does not forward it. Lock leaves the mode unchanged.
 Lock-screen/Secure Input hotkey delivery still needs testing. Authentication
 and lock policy remain normal. Sleep/wake restoration is optional.
 
+Optional menu checkbox: Mute built-in speakers while headless. Off by default; changes apply
+within one second while active. Uncheck or restore to return the previous mute
+state. Already-muted speakers remain muted. Volume, routing, and virtual or
+external audio outputs are unchanged. This silences local playback, not remote
+streaming audio, and does not claim to power down audio hardware. Mute changes
+are journaled for crash recovery with the other physical controls.
+
 CLOSED LID: enable the option, Install Helper, then approve
 Guillotine in macOS Login Items & Extensions, Allow in the Background.
 Keep the app in Applications. Administrator approval is required.

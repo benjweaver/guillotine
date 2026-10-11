@@ -1,13 +1,15 @@
 # Verification — 2026-10-10
 
-Host: MacBookPro18,1, macOS 27.0.1. Build 6 uses release Xcode 27, macOS 13 app deployment, and compiler warnings as errors. XCTest targets 14 to match the installed XCTest libraries. Intel hardware and minimum-OS runtime testing remain outstanding.
+Host: MacBookPro18,1, macOS 27.0.1. Build 8 uses release Xcode 27, macOS 13 app deployment, and compiler warnings as errors. XCTest targets 14 to match the installed XCTest libraries. Intel hardware and minimum-OS runtime testing remain outstanding.
 
 ## Actually run
 
 - 17 XCTest cases pass: disabled launch, battery opt-in, power loss/reconnect, live policy revocation, rechecks around activation, repeated toggles, failure/retry, and shortcut registration/callback behavior.
-- 13 fake hardware-guard integration cases pass: disconnect, expiry/renewal, signals, SIGKILL recovery, duplicate exclusion, explicit restore, battery policy, thermal ordering, and no thermal sleep on AC.
+- 23 fake hardware-guard integration cases pass: disconnect, expiry/renewal, signals, SIGKILL recovery, duplicate exclusion, explicit restore, battery policy, thermal ordering, and no thermal sleep on AC. Audio cases cover default-off, preexisting mute, live/repeated toggles, fragmented/coalesced policy messages, unplugging, thermal cutoff, lease expiry, external unmute, and killed-guard recovery.
 - 9 fake privileged-helper cases cover original/absent settings, disconnection, expiry with blocked renewal, external changes, unplugging, battery thermal cleanup, SIGTERM, SIGKILL/startup recovery, and interrupted absence restoration. These use files instead of system settings and do not run as root.
-- Universal signed build 6 compiles cleanly with release Xcode 27. Both executable architectures and nested signatures are checked before installation. App Intents extraction is omitted because this app defines none; no warning suppression is added to compiler flags.
+- Universal signed build 8 compiles cleanly with release Xcode 27. Both executable architectures and nested signatures are checked before installation. App Intents extraction is omitted because this app defines none; no warning suppression is added to compiler flags.
+- Real build-7 audio guard test on this Mac: built-in speaker mute readback changed 0 → 1, live opt-out restored 0, opt-in muted again, and parent EOF restored 0 with the journal removed. This verified CoreAudio state, not audible output or streaming-client audio.
+- Status-menu outside-click dismissal needs user acceptance: AppKit global mouse monitoring cancels tracking on clicks in another app; a local monitor handles clicks in Settings. Both monitors are removed at menu close. No keyboard events are monitored.
 - Earlier real panel pulse: user confirmed the screen physically turned off and back on, while CoreGraphics retained one active logical display. Registry CurrentPowerState did not change and is not treated as proof.
 - Earlier real keyboard/guard test: zero readback, then restored original 0.001; auto-brightness remained enabled. Caffeine kept its own display assertion; the app and guard held no sleep assertion.
 - **Build 5 failed closed-lid testing.** User confirmed ON and battery allowed. Power log: 20:23:57 Clamshell Sleep on battery 98%, lid-open wake at 20:24:01. Build 6 replaces that path with a root sleep-disable lease. API success in build 5 was insufficient evidence.
@@ -21,12 +23,14 @@ Prior UTM tests concern the earlier sleep-assertion implementation; see [histori
 
 | Test | Expected result |
 | --- | --- |
+| Menu dismissal | Open from a different foreground app, then click that app, the desktop, Settings, and another menu bar item. The menu closes on each outside click. Repeat with left/right clicks, Escape, and the icon. Menu actions still work and no click monitors remain after closure. |
 | Helper approval | Approve the signed service in Login Items. Settings reports Approved. An unsigned or wrong-team XPC client cannot acquire a lease. |
 | Actual sleep setting | Record `pmset -g custom` and `pmset -g`. Activate with closed-lid support: SleepDisabled becomes 1. Restore: prior value/absence returns; other keys unchanged. Repeat and inspect root recovery journal cleanup. |
 | Lid close on AC | Enable closed-lid support, activate, monitor changing clock/video remotely, close 20 seconds, reopen. No Clamshell Sleep event; frames/input continue on the exact display/capture setup. |
 | Lid close on battery | Opt into battery operation, repeat. No Clamshell Sleep event while the lease is active. Keep normal thermal protections in force. |
 | Unplug closed lid | Battery use off: restore physical controls and owned sleep setting; normal clamshell policy may then sleep. Replug must not activate. Battery use on: continue without sleep; live opt-out restores. |
 | Panel/keyboard | Both physically dark immediately. Type and vary ambient light; zero reapplies within one second. Restore latest recorded brightness without changing auto-brightness. Repeat toggles. |
+| Built-in audio | With music/video playing, check Mute built-in speakers while headless while active: local speakers silent within one second, remote stream audio continues on the chosen host. Uncheck: previous mute returns, volume/routing unchanged. Repeat with already-muted speakers, quit, app crash, and power cutoff. Test virtual/external outputs remain unchanged. Audible and streaming results require hardware/client testing. |
 | Caffeine | With closed-lid option off, user sleep policy and Caffeine remain independent. With it on, global sleep is blocked; Caffeine’s own state remains unchanged. |
 | Lock/hotkey | Lock normally while headless; mode stays active. Test local and remote Control–Option–Command–Space at loginwindow. Authenticate normally. Hotkey delivery is not yet certified. |
 | Sleep/wake options | With closed-lid option off, test default persistence and each optional restore setting in fresh sessions. With it on, expect ordinary/manual sleep to be blocked. |

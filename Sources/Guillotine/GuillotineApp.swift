@@ -23,6 +23,8 @@ import AppKit
     private let monitor = PowerMonitor()
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
+    private var outsideClickMonitor: Any?
+    private var settingsClickMonitor: Any?
     private var observations: [NSObjectProtocol] = []
     private lazy var preferences = PreferencesModel()
     private lazy var shortcut = GlobalShortcut { [weak self] in
@@ -43,6 +45,8 @@ import AppKit
             self?.controls.allowBattery = allowed
             self?.session.allowBattery = allowed
         }
+        controls.muteSpeakers = preferences.muteSpeakers
+        preferences.speakerPolicyChanged = { [weak self] muted in self?.controls.muteSpeakers = muted }
         session.refreshPower()
         preferences.applyShortcut = { [weak self] candidate in
             guard let self else { return }
@@ -67,6 +71,18 @@ import AppKit
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        stopMenuMonitoring()
+        // A status menu can track while this accessory app is inactive. Do not
+        // rely on an app-deactivation notification to notice outside clicks.
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak menu] _ in
+            MainActor.assumeIsolated { menu?.cancelTracking() }
+        }
+        settingsClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self, weak menu] event in
+            MainActor.assumeIsolated {
+                if let settings = self?.settingsWindow, event.window === settings { menu?.cancelTracking() }
+            }
+            return event
+        }
         session.refreshPower()
         preferences.refreshLoginStatus()
         preferences.refreshLidHelper()
@@ -77,6 +93,10 @@ import AppKit
         toggle.target = self
         toggle.state = session.enabled ? .on : .off
         menu.addItem(toggle)
+        let audio = NSMenuItem(title: "Mute built-in speakers while headless", action: #selector(toggleSpeakers), keyEquivalent: "")
+        audio.target = self
+        audio.state = preferences.muteSpeakers ? .on : .off
+        menu.addItem(audio)
         add(session.power.label, to: menu)
         add(DisplayStatus.summary, to: menu)
         add(preferences.closedLid ? (preferences.lidHelperReady ? "Closed lid: helper ready • global sleep block" : "Closed lid: helper approval needed") : "Closed lid: normal macOS policy", to: menu)
@@ -95,6 +115,14 @@ import AppKit
         action("Quit Guillotine", #selector(quit), to: menu, key: "q")
     }
 
+    func menuDidClose(_ menu: NSMenu) { stopMenuMonitoring() }
+    private func stopMenuMonitoring() {
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
+        if let settingsClickMonitor { NSEvent.removeMonitor(settingsClickMonitor) }
+        outsideClickMonitor = nil
+        settingsClickMonitor = nil
+    }
+
     private func add(_ title: String, to menu: NSMenu) {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         menu.addItem(item)
@@ -104,6 +132,7 @@ import AppKit
         item.target = self
         menu.addItem(item)
     }
+    @objc private func toggleSpeakers() { preferences.muteSpeakers.toggle() }
     @objc private func toggleMode() {
         if session.enabled { session.disable() } else {
             if preferences.closedLid && !preferences.lidHelperReady {
@@ -143,6 +172,7 @@ import AppKit
         NSApp.terminate(nil)
     }
     func applicationWillTerminate(_ notification: Notification) {
+        stopMenuMonitoring()
         session.disable()
         monitor.stop()
         shortcut.stop()

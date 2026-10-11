@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Ben Weaver and Guillotine contributors
 #import <AppKit/AppKit.h>
+#import <CoreAudio/CoreAudio.h>
 #import <IOKit/IOKitLib.h>
 #import <IOKit/pwr_mgt/IOPMLib.h>
 #import <IOKit/pwr_mgt/IOPMLibDefs.h>
@@ -30,7 +31,7 @@ static NSString *journal, *restoreRequest;
 static BOOL fake, finished, ready, restoreSleep, restoreWake, sleepPending;
 static NSTimeInterval deadline;
 static int lockFD;
-static BOOL allowBattery, closedLid;
+static BOOL allowBattery, closedLid, muteSpeakers;
 static io_connect_t powerConnection;
 static NSString *directory;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
@@ -40,6 +41,81 @@ static BOOL saveJournal(void) {
     BOOL ok=descriptor>=0 && fsync(descriptor)==0;
     if (descriptor>=0) close(descriptor);
     return ok;
+}
+// Only built-in output devices are eligible. Virtual, aggregate, HDMI, USB,
+// and Bluetooth outputs retain their routing, volume, and mute state.
+static NSDictionary<NSString *, NSNumber *> *speakerDevices(void) {
+    if (fake) return @{@"builtin-speakers": @1};
+    AudioObjectPropertyAddress address={kAudioHardwarePropertyDevices,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+    UInt32 size=0;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject,&address,0,NULL,&size)!=noErr) return nil;
+    NSMutableData *data=[NSMutableData dataWithLength:size];
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject,&address,0,NULL,&size,data.mutableBytes)!=noErr) return nil;
+    NSMutableDictionary *devices=[NSMutableDictionary dictionary];
+    AudioDeviceID *ids=data.mutableBytes;
+    for (NSUInteger i=0;i<size/sizeof(AudioDeviceID);i++) {
+        AudioDeviceID device=ids[i]; UInt32 transport=0, length=sizeof(transport);
+        address=(AudioObjectPropertyAddress){kAudioDevicePropertyTransportType,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+        if (AudioObjectGetPropertyData(device,&address,0,NULL,&length,&transport)!=noErr || transport!=kAudioDeviceTransportTypeBuiltIn) continue;
+        address=(AudioObjectPropertyAddress){kAudioDevicePropertyStreams,kAudioObjectPropertyScopeOutput,kAudioObjectPropertyElementMain};
+        length=0;
+        if (AudioObjectGetPropertyDataSize(device,&address,0,NULL,&length)!=noErr || !length) continue;
+        address=(AudioObjectPropertyAddress){kAudioDevicePropertyDeviceUID,kAudioObjectPropertyScopeGlobal,kAudioObjectPropertyElementMain};
+        CFStringRef uid=NULL; length=sizeof(uid);
+        if (AudioObjectGetPropertyData(device,&address,0,NULL,&length,&uid)!=noErr || !uid) return nil;
+        devices[CFBridgingRelease(uid)]=@(device);
+    }
+    return devices;
+}
+static BOOL readMute(AudioDeviceID device, UInt32 *value) {
+    if (fake) {
+        NSString *text=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"test-mute"] encoding:NSUTF8StringEncoding error:nil];
+        *value=text.intValue?1:0; return YES;
+    }
+    AudioObjectPropertyAddress address={kAudioDevicePropertyMute,kAudioObjectPropertyScopeOutput,kAudioObjectPropertyElementMain};
+    UInt32 size=sizeof(*value);
+    return AudioObjectGetPropertyData(device,&address,0,NULL,&size,value)==noErr;
+}
+static BOOL writeMute(AudioDeviceID device, UInt32 value) {
+    if (fake) return [[NSString stringWithFormat:@"%u",value] writeToFile:[directory stringByAppendingPathComponent:@"test-mute"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    AudioObjectPropertyAddress address={kAudioDevicePropertyMute,kAudioObjectPropertyScopeOutput,kAudioObjectPropertyElementMain};
+    Boolean settable=false;
+    return AudioObjectIsPropertySettable(device,&address,&settable)==noErr && settable &&
+        AudioObjectSetPropertyData(device,&address,0,NULL,sizeof(value),&value)==noErr;
+}
+static BOOL restoreAudio(void) {
+    NSDictionary *owned=saved[@"speakerMutes"];
+    if (!owned.count) return YES;
+    NSDictionary *devices=speakerDevices();
+    if (!devices) return NO;
+    for (NSString *uid in owned) {
+        // Stable UIDs avoid restoring a newly assigned numeric device ID.
+        // Keep the journal pending if the original device is temporarily absent.
+        NSNumber *device=devices[uid]; UInt32 current=0;
+        if (!device || !readMute(device.unsignedIntValue,&current)) return NO;
+        if (current==1 && !writeMute(device.unsignedIntValue,[owned[uid] unsignedIntValue])) return NO;
+    }
+    return YES;
+}
+static BOOL applyAudio(NSString **error) {
+    if (!muteSpeakers) {
+        if (!restoreAudio()) { *error=@"Could not restore built-in speaker mute. Retry Restore."; return NO; }
+        if (saved[@"speakerMutes"]) { [saved removeObjectForKey:@"speakerMutes"]; if (!saveJournal()) { *error=@"Could not record speaker restoration."; return NO; } }
+        return YES;
+    }
+    NSDictionary *devices=speakerDevices();
+    if (!devices.count) { *error=@"No built-in speaker output found. Uncheck Mute built-in speakers while headless to continue."; return NO; }
+    NSMutableDictionary *owned=[saved[@"speakerMutes"] mutableCopy] ?: [NSMutableDictionary dictionary];
+    for (NSString *uid in devices) {
+        AudioDeviceID device=[devices[uid] unsignedIntValue]; UInt32 current=0;
+        if (!readMute(device,&current)) { *error=@"Built-in speaker mute is unavailable. Uncheck Mute built-in speakers while headless to continue."; return NO; }
+        // Already-muted speakers need no override and must stay muted on exit.
+        if (current==1) continue;
+        owned[uid]=@(current); saved[@"speakerMutes"]=owned;
+        if (!saveJournal()) { *error=@"Could not save speaker restoration state; audio unchanged."; return NO; }
+        if (!writeMute(device,1)) { *error=@"macOS rejected built-in speaker mute. Uncheck Mute built-in speakers while headless to continue."; return NO; }
+    }
+    return YES;
 }
 static BOOL externalPower(void) {
     if (fake) {
@@ -82,8 +158,8 @@ static BOOL lidServiceCall(BOOL releasing, NSString **error) {
     return ok;
 }
 static BOOL restore(void) {
-    BOOL ok=YES;
-    if ([saved[@"panelOwned"] boolValue] && !fake) ok=(setPanel(panel,1)==KERN_SUCCESS);
+    BOOL ok=restoreAudio();
+    if ([saved[@"panelOwned"] boolValue] && !fake) ok=(setPanel(panel,1)==KERN_SUCCESS) && ok;
     NSDictionary *values=saved[@"keyboards"];
     for (NSString *key in values) {
         uint64_t kid=key.longLongValue;
@@ -127,6 +203,7 @@ static void enforcePolicy(void) {
 static void powerChanged(void *context) { if (ready) enforcePolicy(); }
 static BOOL applyOff(NSString **error) {
     enforcePolicy();
+    if (!applyAudio(error)) return NO;
     if (closedLid) {
         saved[@"lidService"]=@YES;
         if (!saveJournal() || !lidServiceCall(NO,error)) {
@@ -185,6 +262,7 @@ int main(int argc, char **argv) { @autoreleasepool {
     fake=[args containsObject:@"--test-guard"];
     allowBattery=[args containsObject:@"--allow-battery"];
     closedLid=[args containsObject:@"--closed-lid"];
+    muteSpeakers=[args containsObject:@"--mute-speakers"];
     restoreSleep=[args containsObject:@"--restore-on-sleep"];
     restoreWake=[args containsObject:@"--restore-on-wake"];
     directory=fake?args.lastObject:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Guillotine"];
@@ -225,15 +303,30 @@ int main(int argc, char **argv) { @autoreleasepool {
     emit(@"READY");
     fcntl(STDIN_FILENO,F_SETFL,O_NONBLOCK);
     dispatch_source_t input=dispatch_source_create(DISPATCH_SOURCE_TYPE_READ,STDIN_FILENO,0,dispatch_get_main_queue());
+    NSMutableData *pending=[NSMutableData data];
     dispatch_source_set_event_handler(input,^{
         char bytes[128]; ssize_t n=read(STDIN_FILENO,bytes,sizeof(bytes));
         if (n==0) finish(0,@"App disconnected");
         if (n>0) {
-            NSString *message=[[NSString alloc] initWithBytes:bytes length:n encoding:NSUTF8StringEncoding];
-            if ([message containsString:@"battery=0"]) allowBattery=NO;
-            else if ([message containsString:@"battery=1"]) allowBattery=YES;
-            deadline=NSProcessInfo.processInfo.systemUptime+5;
-            enforcePolicy();
+            [pending appendBytes:bytes length:(NSUInteger)n];
+            if (pending.length>4096) finish(2,@"Invalid app lease message");
+            for (;;) {
+                const char *buffer=pending.bytes;
+                const char *newline=memchr(buffer,'\n',pending.length);
+                if (!newline) break;
+                NSUInteger length=(NSUInteger)(newline-buffer);
+                NSString *message=[[NSString alloc] initWithBytes:buffer length:length encoding:NSUTF8StringEncoding];
+                [pending replaceBytesInRange:NSMakeRange(0,length+1) withBytes:NULL length:0];
+                if (![message hasPrefix:@"renew"]) continue;
+                if ([message containsString:@"battery=0"]) allowBattery=NO;
+                else if ([message containsString:@"battery=1"]) allowBattery=YES;
+                if ([message containsString:@"mute=0"]) muteSpeakers=NO;
+                else if ([message containsString:@"mute=1"]) muteSpeakers=YES;
+                deadline=NSProcessInfo.processInfo.systemUptime+5;
+                enforcePolicy();
+                NSString *audioError=nil;
+                if (!applyAudio(&audioError)) finish(2,audioError);
+            }
         }
     }); dispatch_resume(input);
     for (NSNumber *number in @[@(SIGTERM),@(SIGINT)]) {

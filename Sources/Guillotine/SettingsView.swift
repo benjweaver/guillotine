@@ -41,6 +41,10 @@ import ServiceManagement
         catch { lidHelperError = error.localizedDescription }
         refreshLidHelper()
     }
+    var speakerPolicyChanged: ((Bool) -> Void)?
+    @Published var muteSpeakers = UserDefaults.standard.bool(forKey: "muteSpeakers") {
+        didSet { UserDefaults.standard.set(muteSpeakers, forKey: "muteSpeakers"); speakerPolicyChanged?(muteSpeakers) }
+    }
     var batteryPolicyChanged: ((Bool) -> Void)?
     @Published var allowBattery = UserDefaults.standard.bool(forKey: "allowBattery") {
         didSet { UserDefaults.standard.set(allowBattery, forKey: "allowBattery"); batteryPolicyChanged?(allowBattery) }

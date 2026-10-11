@@ -34,6 +34,89 @@ class GuardTests(unittest.TestCase):
     def restored(self, child):
         self.assertEqual(child.wait(timeout=10), 0)
         self.assertFalse((self.folder / 'hardware-session.plist').exists())
+    def mute(self):
+        return (self.folder / 'test-mute').read_text()
+    def set_mute(self, value):
+        (self.folder / 'test-mute').write_text(str(value))
+    def policy(self, child, enabled):
+        child.stdin.write(f'renew mute={int(enabled)}\n'.encode()); child.stdin.flush()
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if self.mute() == str(int(enabled)):
+                return
+            time.sleep(.02)
+        self.fail('Audio policy did not apply')
+    def test_speakers_unchanged_when_option_off(self):
+        self.set_mute(0)
+        child = self.start(); self.ready(child)
+        self.assertEqual(self.mute(), '0')
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_speaker_mute_restores_on_disconnect(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers'); self.ready(child)
+        self.assertEqual(self.mute(), '1')
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_preexisting_mute_is_preserved(self):
+        self.set_mute(1)
+        child = self.start('--mute-speakers'); self.ready(child)
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '1')
+    def test_live_audio_policy_and_repeated_toggles(self):
+        self.set_mute(0)
+        child = self.start(); self.ready(child)
+        for _ in range(5):
+            self.policy(child, True)
+            self.policy(child, False)
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_crashed_audio_guard_recovers_by_uid(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers'); self.ready(child)
+        child.kill(); child.wait(timeout=2)
+        self.assertEqual(self.mute(), '1')
+        recovered = self.start('--recover')
+        self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
+        self.restored(recovered)
+        self.assertEqual(self.mute(), '0')
+    def test_unplug_restores_speakers(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers'); self.ready(child)
+        (self.folder / 'test-power').write_text('battery')
+        self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_thermal_cutout_restores_speakers(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers', '--allow-battery'); self.ready(child)
+        (self.folder / 'test-power').write_text('battery')
+        (self.folder / 'test-hot').touch()
+        self.restored(child)
+        self.assertEqual(self.mute(), '0')
+        self.assertTrue((self.folder / 'test-sleep-request').exists())
+    def test_external_unmute_is_preserved_on_exit(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers'); self.ready(child)
+        self.set_mute(0)
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_audio_lease_expiry_restores(self):
+        self.set_mute(0)
+        child = self.start('--mute-speakers'); self.ready(child)
+        self.restored(child)
+        self.assertEqual(self.mute(), '0')
+    def test_fragmented_and_coalesced_audio_policy(self):
+        self.set_mute(0)
+        child = self.start(); self.ready(child)
+        child.stdin.write(b'renew mu'); child.stdin.flush()
+        time.sleep(.05)
+        child.stdin.write(b'te=1\nrenew mute=0\nrenew mute=1\n'); child.stdin.flush()
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline and self.mute() != '1':
+            time.sleep(.02)
+        self.assertEqual(self.mute(), '1')
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.mute(), '0')
     def test_battery_requires_opt_in(self):
         (self.folder / 'test-power').write_text('battery')
         child = self.start()

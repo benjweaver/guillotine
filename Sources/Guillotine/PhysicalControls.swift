@@ -9,6 +9,7 @@ import Darwin
     private var heartbeat: Timer?
     var allowBattery = false
     var closedLid = false
+    var muteSpeakers = false
     var restoreOnSleep = false
     var restoreOnWake = false
     var onStopped: ((String) -> Void)?
@@ -36,7 +37,7 @@ import Darwin
         signal(SIGPIPE, SIG_IGN)
         let child = Process(), input = Pipe(), output = Pipe()
         child.executableURL = executable
-        child.arguments = (allowBattery ? ["--allow-battery"] : []) + (closedLid ? ["--closed-lid"] : []) + (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
+        child.arguments = (muteSpeakers ? ["--mute-speakers"] : []) + (allowBattery ? ["--allow-battery"] : []) + (closedLid ? ["--closed-lid"] : []) + (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
         child.standardInput = input; child.standardOutput = output
         child.standardError = FileHandle.nullDevice
         try child.run()
@@ -61,7 +62,7 @@ import Darwin
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                do { try self.lease?.write(contentsOf: Data("renew battery=\(self.allowBattery ? 1 : 0)\n".utf8)) }
+                do { try self.lease?.write(contentsOf: Data("renew battery=\(self.allowBattery ? 1 : 0) mute=\(self.muteSpeakers ? 1 : 0)\n".utf8)) }
                 catch { self.onStopped?(self.stopReason) }
             }
         }

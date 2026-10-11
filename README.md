@@ -20,6 +20,8 @@ Guillotine leaves display layout, virtual displays, network interfaces, streamin
 6. Unplugging restores unless battery use is allowed. Turning battery use off on battery restores immediately. Reconnecting never reactivates. Launch/login starts restored.
 7. Serious/critical macOS thermal pressure on battery restores physical controls and the owned sleep override, then requests system sleep. This uses OS thermal pressure, not a fabricated Celsius sensor. No deliberate heat test is appropriate. Another utility’s pre-existing sleep block can still reject sleep.
 
+**Mute built-in speakers while headless** in the menu is optional and off by default. It applies within one second while headless, and unchecking it restores the prior mute state. Volume and routing stay unchanged; virtual, aggregate, USB, HDMI, and Bluetooth outputs are excluded. This silences playback through built-in audio; it does not claim to power down the audio hardware or mute remote streaming audio. Already-muted speakers stay muted. The guard journals changes by stable device UID and restores them on disable, quit, power-policy cutoff, or lease expiry; killed-guard recovery runs when the app reopens. A current unmuted value is preserved during restoration. Identical mute writes from another app cannot be distinguished. During a session, the guard reapplies mute once per second.
+
 Transitions or keyboard activity may briefly light the hardware before the guard reapplies off on its next one-second tick. Status indicates ownership, not an electrical power measurement.
 
 Same-user recovery without changing lock state:

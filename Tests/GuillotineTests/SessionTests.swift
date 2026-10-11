@@ -205,6 +205,17 @@ import Carbon
         XCTAssertEqual(reloaded.lowPowerPercentage, 100)
         XCTAssertEqual(reloaded.lowPowerPolicy, .off)
     }
+    func testSleepBlockMigrationPreservesLaterOptIn() throws {
+        let name = "GuillotineTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(true, forKey: "closedLid")
+        let preferences = PreferencesModel(defaults: defaults)
+        XCTAssertFalse(preferences.closedLid)
+        preferences.closedLid = true
+        let reloaded = PreferencesModel(defaults: defaults)
+        XCTAssertTrue(reloaded.closedLid)
+    }
     func testShortcutValidationAndPersistence() {
         XCTAssertTrue(Shortcut.standard.valid)
         XCTAssertEqual(Shortcut.standard.key, UInt32(kVK_Space))

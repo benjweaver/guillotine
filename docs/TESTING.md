@@ -34,7 +34,7 @@ Prior UTM tests concern the earlier sleep-assertion implementation; see [histori
 | Lid close on AC | Enable closed-lid support, activate, monitor changing clock/video remotely, close 20 seconds, reopen. No Clamshell Sleep event; frames/input continue on the exact display/capture setup. |
 | Lid close on battery | Opt into battery operation, repeat. No Clamshell Sleep event while the lease is active. Keep normal thermal protections in force. |
 | Unplug closed lid | Battery use off: restore physical controls and owned sleep setting; normal clamshell policy may then sleep. Replug must not activate. Battery use on: continue without sleep; live opt-out restores. |
-| Panel/keyboard | Both physically dark immediately. Type and vary ambient light; zero reapplies within one second. Restore latest recorded brightness without changing auto-brightness. Repeat toggles. |
+| Panel/keyboard | Both physically dark on activation. Panel-off is requested once; macOS may relight it on lid opening or wake. Type and vary ambient light; keyboard zero reapplies within one second. Restore latest recorded keyboard brightness without changing auto-brightness. Repeat toggles. |
 | Built-in audio | With music/video playing, check Mute built-in speakers while headless while active: local speakers silent within one second, remote stream audio continues on the chosen host. Uncheck: previous mute returns, volume/routing unchanged. Repeat with already-muted speakers, quit, app crash, and power cutoff. Test virtual/external outputs remain unchanged. Audible and streaming results require hardware/client testing. |
 | Caffeine | With closed-lid option off, user sleep policy and Caffeine remain independent. With it on, global sleep is blocked; Caffeine’s own state remains unchanged. |
 | Lock/hotkey | Lock normally while headless; mode stays active. Test local and remote Control–Option–Command–Space at loginwindow. Authenticate normally. Hotkey delivery is not yet certified. |
@@ -51,3 +51,47 @@ Prior UTM tests concern the earlier sleep-assertion implementation; see [histori
 | Remove/reboot | Restore, Remove Helper, disable login, quit/delete. No owned override remains. Reboot/login starts disabled; startup helper recovery precedes new leases. |
 
 Keep results separate: fake tests, actual settings, physical darkness, no-sleep power logs, and remote frame progression establish different properties. Private APIs need revalidation after updates.
+
+## Build 11 panel-isolation trial
+
+Panel-power control defaults off, and the persisted closed-lid sleep-block option
+resets off once. Leave both off and use Caffeine independently. Confirm the panel
+goes dark on lid closure, streaming connects and reconnects after a delay, and lid
+opening plus the restore shortcut leaves WindowServer healthy. Check fresh power
+and Vibepollo logs afterward; Caffeine alone does not guarantee clamshell sleep
+prevention. Hardware acceptance is pending.
+
+Local validation on 2026-10-11: 20 app tests, 38 fake guard tests, and 21 fake
+helper tests passed. Developer ID Release build completed without compiler
+warnings; strict recursive signature verification passed. Installed build 11
+and confirmed both panel control and closed-lid sleep prevention are off.
+No new physical closed-lid streaming test has been performed.
+
+## Build 12 panel request regression
+
+With panel control selected, observe exactly one off request across multiple guard
+ticks and app lease renewals, followed by one on request on disconnect, SIGTERM,
+or lease expiry. Recovery after a killed guard must still restore journaled panel
+ownership without needing the panel option on the recovery command. Confirm on
+hardware that lid-open and wake transitions no longer fight recurring off requests;
+macOS is allowed to relight the panel until another explicit activation.
+
+2026-10-11 validation: all 20 app tests and 39 fake guard tests passed. The
+Developer ID Release build succeeded without compiler warnings, and recursive
+strict signature verification passed outside the sandbox. Build 12 was installed
+and relaunched disabled. Closed-lid streaming and lid-open crash acceptance remain
+pending; no streaming or panel activation was performed during installation.
+
+## Build 13 standard panel control
+
+The panel checkbox and app preference are removed. Every activation requests
+panel-off once and restoration requests panel-on; periodic ticks and renewals
+remain free of panel-power writes. Recovery of keyboard-only trial journals
+leaves their unowned panel alone. The explicit restore shortcut still provides
+panel-on rescue while disabled. Leave the lid open for the current interim setup;
+closed-lid reliability remains unresolved.
+
+2026-10-11 validation: 20 app tests and 40 fake guard tests passed. The signed
+Release build had no compiler warnings, strict recursive signature verification
+passed outside the sandbox, and build 13 was installed and relaunched disabled.
+Panel activation and closed-lid streaming remain for physical acceptance.

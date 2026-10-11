@@ -1,5 +1,18 @@
 # Physical controls and closed-lid sleep prevention
 
+## Panel power transitions (build 13)
+
+Every activation requests panel-off once; restoration requests panel-on. The
+periodic maintenance timer and wake notifications never reapply panel-off.
+macOS may relight the panel during lid-open or wake transitions; another off
+request requires restoring and activating again. There is no separate panel
+control preference. Startup recovery honors recorded panel ownership, including
+keyboard-only journals from builds 11–12. The restore shortcut while disabled
+still provides explicit panel-on rescue.
+
+Closed-lid streaming remains unverified. For the current interim setup, leave
+the lid open and use Caffeine independently of Guillotine's optional sleep block.
+
 ## Why the implementation changed
 
 The physical build-5 test failed: the user confirmed ON with battery allowed, and the power log recorded **2026-10-10 20:23:57, Clamshell Sleep, battery 98%**, followed by lid-open wake. This is system sleep; no streaming-host change is needed to explain it.

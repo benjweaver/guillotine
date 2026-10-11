@@ -67,6 +67,15 @@ import ServiceManagement
     }
     init(defaults: UserDefaults = .standard) {
         energyDefaults = defaults
+        // Preserve the earlier trial's one-time sleep-block reset, including upgrades
+        // from before the trial. Later explicit sleep-block choices stay intact.
+        if !defaults.bool(forKey: "sleepBlockMigrationApplied") {
+            if defaults.object(forKey: "controlPanel") == nil {
+                defaults.set(false, forKey: "closedLid")
+            }
+            defaults.set(true, forKey: "sleepBlockMigrationApplied")
+        }
+        closedLid = defaults.bool(forKey: "closedLid")
         batterySleepEnabled = defaults.object(forKey: "batterySleepEnabled") == nil ? true : defaults.bool(forKey: "batterySleepEnabled")
         batterySleepPercentage = BatteryPolicy.percentage(defaults.object(forKey: "batterySleepPercentage") as? Int ?? BatteryPolicy.defaultSleepPercentage)
         lowPowerPolicy = LowPowerPolicy(rawValue: defaults.integer(forKey: "lowPowerPolicy")) ?? .off
@@ -88,8 +97,8 @@ import ServiceManagement
     @Published var allowBattery = UserDefaults.standard.bool(forKey: "allowBattery") {
         didSet { UserDefaults.standard.set(allowBattery, forKey: "allowBattery"); batteryPolicyChanged?(allowBattery) }
     }
-    @Published var closedLid = UserDefaults.standard.bool(forKey: "closedLid") {
-        didSet { UserDefaults.standard.set(closedLid, forKey: "closedLid") }
+    @Published var closedLid: Bool {
+        didSet { energyDefaults.set(closedLid, forKey: "closedLid") }
     }
     var applyShortcut: ((Shortcut) throws -> Void)?
 
@@ -143,7 +152,7 @@ struct SettingsView: View {
                 Label(session.power.label, systemImage: session.power == .external ? "powerplug.fill" : "battery.50")
                 Text(DisplayStatus.summary).font(.caption).foregroundStyle(.secondary)
                 Text(session.message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button(session.enabled ? "Restore Screen & Keyboard" : "Cut Screen & Keyboard") {
+                Button(session.enabled ? "Restore Controls" : "Enable Guillotine") {
                     toggle()
                 }
                 if let error = session.error { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
@@ -196,8 +205,8 @@ struct SettingsView: View {
                     }
                 }
                 Text("Low Power Mode can reduce heat while running on battery, which may help avoid thermal limits. Requires the approved power helper; restores the prior battery setting afterward. Battery options apply live while headless.").font(.caption).foregroundStyle(.secondary)
-                Toggle("Allow closed-lid operation (requires helper)", isOn: $preferences.closedLid)
-                Text("Temporarily sets global SleepDisabled while active. This also blocks ordinary/manual sleep until restored. Original value is journaled by a privileged, leased helper. Capture may still need a virtual display/adapter; physical testing remains required.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Prevent closed-lid sleep (experimental, WIP)", isOn: $preferences.closedLid)
+                Text("Closed-lid operation is not yet reliable. Requires the approved power helper. Temporarily sets global SleepDisabled while active. This also blocks ordinary/manual sleep until restored. Original value is journaled by a privileged, leased helper. Capture may still need a virtual display/adapter; physical testing remains required.").font(.caption).foregroundStyle(.secondary)
                 Text("Power helper: \(preferences.lidHelperStatus)").font(.caption)
                 HStack {
                     switch preferences.lidHelperState {
@@ -220,7 +229,7 @@ struct SettingsView: View {
                 Button("Approve in Login Items…") { SMAppService.openSystemSettingsLoginItems() }
             }
             if let error = preferences.loginError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
-            Text("Experimental private APIs switch off the built-in Apple Silicon panel and keyboard backlight while leaving its logical display connected. Lock does not change the mode. Lock-screen hotkey delivery needs testing; Mac sleep still interrupts streaming normally.")
+            Text("Panel power and keyboard backlight controls use private macOS APIs. Panel-off is requested once when enabled; macOS may turn it back on after lid opening or wake. Caffeine can handle sleep prevention independently. Lock does not change the mode. Lock-screen hotkey delivery needs testing; Mac sleep still interrupts streaming normally.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)

@@ -47,6 +47,45 @@ class GuardTests(unittest.TestCase):
                 return
             time.sleep(.02)
         self.fail('Audio policy did not apply')
+    def test_default_session_owns_and_restores_panel(self):
+        child = self.start(); self.ready(child)
+        state = plistlib.loads((self.folder / 'hardware-session.plist').read_bytes())
+        self.assertTrue(state['panelOwned'])
+        child.stdin.close(); self.restored(child)
+        self.assertEqual((self.folder / 'test-panel-requests').read_text(), '0\n1\n')
+        self.assertFalse((self.folder / 'test-helper-policy.plist').exists())
+    def test_keyboard_only_trial_journal_does_not_restore_unowned_panel(self):
+        (self.folder / 'hardware-session.plist').write_bytes(
+            plistlib.dumps({'panelOwned': False, 'keyboards': {'1': 0.5}}))
+        recovered = self.start('--recover')
+        self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
+        self.restored(recovered)
+        self.assertFalse((self.folder / 'test-panel-requests').exists())
+    def test_panel_requests_only_at_activation_and_restoration(self):
+        for ending in ('disconnect', 'signal', 'expiry'):
+            with self.subTest(ending=ending):
+                requests = self.folder / 'test-panel-requests'
+                requests.unlink(missing_ok=True)
+                child = self.start(); self.ready(child)
+                for _ in range(3):
+                    child.stdin.write(b'renew\n'); child.stdin.flush()
+                    time.sleep(1.1)
+                self.assertEqual(requests.read_text(), '0\n')
+                if ending == 'disconnect':
+                    child.stdin.close()
+                elif ending == 'signal':
+                    child.terminate()
+                self.restored(child)
+                self.assertEqual(requests.read_text(), '0\n1\n')
+    def test_panel_is_restored_after_crash(self):
+        child = self.start(); self.ready(child)
+        self.assertEqual((self.folder / 'test-panel-requests').read_text(), '0\n')
+        child.kill(); child.wait(timeout=2)
+        # Recovery uses journal ownership to restore panel power.
+        recovered = self.start('--recover')
+        self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
+        self.restored(recovered)
+        self.assertEqual((self.folder / 'test-panel-requests').read_text(), '0\n1\n')
     def test_speakers_unchanged_when_option_off(self):
         self.set_mute(0)
         child = self.start(); self.ready(child)

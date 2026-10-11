@@ -1,9 +1,11 @@
 GUILLOTINE — OFF WITH THE HEAD
 
-Cut Screen & Keyboard powers off the built-in Apple Silicon panel and
+Enable Guillotine requests built-in panel power-off once and turns off the
 keyboard backlight while retaining the logical display. It never substitutes
 screen brightness zero. Keyboard zero readback is verified; auto-brightness
-is unchanged. Private APIs require revalidation after macOS updates.
+is unchanged. Panel power is not reapplied by periodic ticks or wake events.
+macOS may relight the panel; restore and enable again for another off request.
+Private APIs require revalidation after macOS updates.
 
 Restore: Control–Option–Command–Space. Fn is optional locally; Vibepollo’s
 inspected input source does not forward it. Lock leaves the mode unchanged.
@@ -18,7 +20,8 @@ external audio outputs are unchanged. This silences local playback, not remote
 streaming audio, and does not claim to power down audio hardware. Mute changes
 are journaled for crash recovery with the other physical controls.
 
-CLOSED LID: enable the option, Install Helper, then approve
+CLOSED LID (EXPERIMENTAL, WIP): Not yet reliable. Enable the option,
+Install Helper, then approve
 Guillotine in macOS Login Items & Extensions, Allow in the Background.
 Keep the app in Applications. Administrator approval is required.
 

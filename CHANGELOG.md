@@ -4,6 +4,18 @@ All notable changes are documented here using Keep a Changelog.
 
 ## Unreleased
 
+## [1.0.1] - 2026-10-11
+
+### Fixed
+
+- Request panel power-off once at activation, then power-on at restoration. Periodic guard ticks and lease renewals no longer send panel-power requests or compete with lid-open and wake transitions.
+- Preserve recovery of recorded panel ownership, including keyboard-only journals from local test builds.
+
+### Changed
+
+- Mark closed-lid sleep prevention as experimental, WIP, and not yet reliable in Settings, menu status, and setup guidance. Recommend leaving the lid open; the WindowServer failure's trigger remains unresolved.
+- Reset the legacy closed-lid sleep block to off once on upgrade; later explicit choices persist. Sleep prevention remains independent of panel control.
+
 ### Added
 
 - Homebrew cask installation through `benjweaver/guillotine/guillotine`, with verified release checksums and tap updates from the release script.

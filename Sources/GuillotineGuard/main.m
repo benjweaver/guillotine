@@ -190,9 +190,15 @@ static BOOL lidServiceCall(BOOL releasing, NSString **error) {
     if (!ok && error) *error=failure;
     return ok;
 }
+static BOOL requestPanelPower(uint32_t state) {
+    if (!fake) return setPanel(panel,state)==KERN_SUCCESS;
+    NSString *path=[directory stringByAppendingPathComponent:@"test-panel-requests"];
+    NSString *previous=[NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    return [[previous stringByAppendingFormat:@"%u\n",state] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+}
 static BOOL restore(void) {
     BOOL ok=restoreAudio();
-    if ([saved[@"panelOwned"] boolValue] && !fake) ok=(setPanel(panel,1)==KERN_SUCCESS) && ok;
+    if ([saved[@"panelOwned"] boolValue]) ok=requestPanelPower(1) && ok;
     NSDictionary *values=saved[@"keyboards"];
     for (NSString *key in values) {
         uint64_t kid=key.longLongValue;
@@ -237,7 +243,7 @@ static void enforcePolicy(void) {
         sleepCutout([NSString stringWithFormat:@"Battery cutoff (%.0f%%, threshold %ld%%)",percentage,(long)sleepBelow]);
 }
 static void powerChanged(void *context) { if (ready) enforcePolicy(); }
-static BOOL applyOff(NSString **error) {
+static BOOL maintainControls(NSString **error) {
     enforcePolicy();
     if (!applyAudio(error)) return NO;
     if (closedLid || lowPowerBelow>0 || [saved[@"lidService"] boolValue]) {
@@ -260,28 +266,29 @@ static BOOL applyOff(NSString **error) {
             *error=@"macOS rejected keyboard backlight control."; return NO;
         }
     }
-    if (!fake && setPanel(panel,0)!=KERN_SUCCESS) { *error=@"macOS rejected built-in panel power control."; return NO; }
     return YES;
 }
-static BOOL loadHardware(NSString **error) {
+static BOOL loadHardware(BOOL needsPanel, NSString **error) {
     if (fake) return YES;
 #if !defined(__arm64__)
     *error=@"Panel power control requires an Apple Silicon MacBook."; return NO;
 #else
-    void *lib=dlopen("/System/Library/PrivateFrameworks/IOMobileFramebuffer.framework/IOMobileFramebuffer",RTLD_NOW);
-    OpenPanel open=lib?(OpenPanel)dlsym(lib,"IOMobileFramebufferOpen"):NULL;
-    setPanel=lib?(SetPanelPower)dlsym(lib,"IOMobileFramebufferRequestPowerChange"):NULL;
-    if (!open || !setPanel) { *error=@"Panel power API unavailable on this macOS version."; return NO; }
-    io_iterator_t iterator=0;
-    IOServiceGetMatchingServices(kIOMainPortDefault,IOServiceMatching("IOMobileFramebuffer"),&iterator);
-    io_service_t service;
-    while ((service=IOIteratorNext(iterator))) {
-        NSString *name=CFBridgingRelease(IORegistryEntryCreateCFProperty(service,CFSTR("IONameMatched"),NULL,0));
-        if ([name hasPrefix:@"disp0,"]) open(service,mach_task_self(),0,&panel);
-        IOObjectRelease(service);
+    if (needsPanel) {
+        void *lib=dlopen("/System/Library/PrivateFrameworks/IOMobileFramebuffer.framework/IOMobileFramebuffer",RTLD_NOW);
+        OpenPanel open=lib?(OpenPanel)dlsym(lib,"IOMobileFramebufferOpen"):NULL;
+        setPanel=lib?(SetPanelPower)dlsym(lib,"IOMobileFramebufferRequestPowerChange"):NULL;
+        if (!open || !setPanel) { *error=@"Panel power API unavailable on this macOS version."; return NO; }
+        io_iterator_t iterator=0;
+        IOServiceGetMatchingServices(kIOMainPortDefault,IOServiceMatching("IOMobileFramebuffer"),&iterator);
+        io_service_t service;
+        while ((service=IOIteratorNext(iterator))) {
+            NSString *name=CFBridgingRelease(IORegistryEntryCreateCFProperty(service,CFSTR("IONameMatched"),NULL,0));
+            if ([name hasPrefix:@"disp0,"]) open(service,mach_task_self(),0,&panel);
+            IOObjectRelease(service);
+        }
+        IOObjectRelease(iterator);
+        if (!panel) { *error=@"No controllable built-in Apple Silicon panel found. Desktop/external displays are not supported."; return NO; }
     }
-    IOObjectRelease(iterator);
-    if (!panel) { *error=@"No controllable built-in Apple Silicon panel found. Desktop/external displays are not supported."; return NO; }
     dlopen("/System/Library/PrivateFrameworks/CoreBrightness.framework/CoreBrightness",RTLD_NOW);
     keyboard=[[NSClassFromString(@"KeyboardBrightnessClient") alloc] init];
     if (![keyboard respondsToSelector:@selector(copyKeyboardBacklightIDs)] ||
@@ -318,14 +325,17 @@ int main(int argc, char **argv) { @autoreleasepool {
     }
     [[NSFileManager defaultManager] removeItemAtPath:restoreRequest error:nil];
     NSString *error=nil;
-    if (!loadHardware(&error)) { emit([@"ERROR " stringByAppendingString:error]); return 2; }
     saved=[[NSDictionary dictionaryWithContentsOfFile:journal] mutableCopy];
+    // Recovery must restore recorded panel ownership, including journals from older builds.
+    BOOL needsPanel=![args containsObject:@"--recover"] || [saved[@"panelOwned"] boolValue];
+    if (!loadHardware(needsPanel,&error)) { emit([@"ERROR " stringByAppendingString:error]); return 2; }
     if (saved && !restore()) { emit(@"ERROR Previous hardware session could not be restored. Restart macOS or retry."); return 3; }
     if ([args containsObject:@"--recover"] || [args containsObject:@"--restore"]) {
         // Explicit rescue may power the panel on even with no remaining ownership
         // journal. Ordinary startup recovery never wakes an unowned display.
         if ([args containsObject:@"--restore"]) {
-            BOOL restored=fake?[@"on" writeToFile:[directory stringByAppendingPathComponent:@"test-panel-on"] atomically:YES encoding:NSUTF8StringEncoding error:nil]:setPanel(panel,1)==KERN_SUCCESS;
+            BOOL restored=requestPanelPower(1);
+            if (fake && restored) restored=[@"on" writeToFile:[directory stringByAppendingPathComponent:@"test-panel-on"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
             if (!restored) { emit(@"ERROR Could not power the built-in panel on."); return 3; }
         }
         emit(@"RECOVERED"); return 0;
@@ -345,7 +355,14 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!power && !fake) finish(2,@"Power notification setup failed");
     if (power) CFRunLoopAddSource(CFRunLoopGetMain(),power,kCFRunLoopCommonModes);
     [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ if (ready) enforcePolicy(); }];
-    if (!applyOff(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
+    if (!maintainControls(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
+    // Panel power is a session transition, not a periodically enforced policy.
+    // Repeated requests can compete with macOS lid and display wake transitions.
+    // Ownership was journaled before this write so failures and crashes can restore it.
+    if (!requestPanelPower(0)) {
+        emit(@"ERROR macOS rejected built-in panel power control.");
+        finish(2,@"Panel power control failed");
+    }
     ready=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
     emit(@"READY");
     fcntl(STDIN_FILENO,F_SETFL,O_NONBLOCK);
@@ -408,7 +425,7 @@ int main(int argc, char **argv) { @autoreleasepool {
         if (sleepPending) { sleepPending=NO; deadline=NSProcessInfo.processInfo.systemUptime+8; }
         if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
         NSString *failure=nil;
-        if (!applyOff(&failure)) finish(2,failure);
+        if (!maintainControls(&failure)) finish(2,failure);
     }];
     [[NSRunLoop mainRunLoop] run];
     return 0;

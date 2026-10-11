@@ -31,7 +31,10 @@ import AppKit
         guard let self else { return }
         if self.session.enabled { self.session.disable(reason: "Physical controls turned off with the global shortcut.") }
         else {
-            do { try self.controls.emergencyRestore(); self.session.reportRestoration("Built-in panel power-on requested with the global shortcut.") }
+            do {
+                try self.controls.emergencyRestore()
+                self.session.reportRestoration("Built-in panel power-on requested with the global shortcut.")
+            }
             catch { self.session.reportError(error.localizedDescription) }
         }
     }
@@ -101,7 +104,7 @@ import AppKit
         menu.removeAllItems()
         add("Guillotine · Off with the head", to: menu)
         menu.addItem(.separator())
-        let toggle = NSMenuItem(title: session.enabled ? "Restore Screen & Keyboard" : "Cut Screen & Keyboard", action: #selector(toggleMode), keyEquivalent: "")
+        let toggle = NSMenuItem(title: session.enabled ? "Restore Controls" : "Enable Guillotine", action: #selector(toggleMode), keyEquivalent: "")
         toggle.target = self
         toggle.state = session.enabled ? .on : .off
         menu.addItem(toggle)
@@ -111,7 +114,7 @@ import AppKit
         menu.addItem(audio)
         add(session.power.label, to: menu)
         add(DisplayStatus.summary, to: menu)
-        add(preferences.closedLid ? (preferences.lidHelperReady ? "Closed lid: helper ready • global sleep block" : "Closed lid: helper approval needed") : "Closed lid: normal macOS policy", to: menu)
+        add(preferences.closedLid ? (preferences.lidHelperReady ? "Closed lid: experimental, WIP • global sleep block" : "Closed lid: experimental, WIP • helper approval needed") : "Closed lid: normal macOS policy", to: menu)
         add(preferences.allowBattery ? "Battery allowed • thermal cutout active" : "Battery disabled • unplug restores", to: menu)
         if preferences.allowBattery {
             add(preferences.batterySleepEnabled ? "Battery sleep: \(preferences.batterySleepPercentage)%" : "Battery sleep: off", to: menu)

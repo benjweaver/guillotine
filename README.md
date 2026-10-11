@@ -2,7 +2,9 @@
 
 **Off with the head.** A native menu bar switch that powers off an Apple Silicon MacBook’s physical panel and keyboard backlight while retaining its logical display for remote access.
 
-Lid-open controls leave sleep settings and Caffeine independent. **Optional closed-lid support requires an approved privileged helper and temporarily disables system sleep globally, including ordinary and manual sleep.** That broader control replaces the experimental lid-only override, which failed the physical test on this Mac. No brightness-zero substitute is used for the panel.
+**Keep the lid open for the current supported workflow.** Enable Guillotine to request panel power-off once and turn off the keyboard backlight, then use Caffeine independently if you want to prevent idle sleep. Guillotine no longer repeats panel power-off requests every second. macOS may relight the panel after a display transition; Restore and Enable again to request off again. No brightness-zero substitute is used for the panel.
+
+**Prevent closed-lid sleep is experimental, WIP, and not yet reliable.** Closed-lid streaming has failed in physical testing, including a WindowServer watchdog restart when the lid was reopened. The trigger is unresolved; the panel-request change is not a confirmed crash fix. The optional approved privileged helper temporarily disables system sleep globally, including ordinary and manual sleep. Do not rely on it for unattended closed-lid access.
 
 ## Install with Homebrew
 
@@ -10,9 +12,9 @@ Lid-open controls leave sleep settings and Caffeine independent. **Optional clos
 brew install --cask benjweaver/guillotine/guillotine
 ```
 
-Update with `brew upgrade --cask benjweaver/guillotine/guillotine`. The tap uses
-standard GitHub release URLs, like Revoke; unauthenticated installation becomes
-available when Ben makes the app and tap repositories public.
+Update with `brew upgrade --cask benjweaver/guillotine/guillotine`. The public tap
+uses ordinary GitHub release URLs and SHA-256 checksums. Installation requires no
+GitHub token or custom download strategy.
 
 Before upgrading, Restore in Guillotine. Reload the helper in Settings if the
 release changes it. Before uninstalling, Restore, Remove Helper, and disable
@@ -27,8 +29,8 @@ Guillotine leaves display layout, virtual displays, network interfaces, streamin
 ## Use
 
 1. Connect external power or opt into **Allow on battery** (off by default). Plugged in but not charging counts as external power.
-2. For closed-lid use, enable **Allow closed-lid operation**, choose **Install Helper…**, and approve Guillotine under macOS **Login Items & Extensions → Allow in the Background**. Keep the app in Applications. Administrator approval is required by macOS.
-3. Choose **Cut Screen & Keyboard**. Activation requires working power notifications, a registered restore shortcut, both physical controls, and, when selected, a working privileged lease. Failed activation restores owned changes and reports an error.
+2. Leave the lid open and **Prevent closed-lid sleep (experimental, WIP)** off for normal use. If you are testing that option, choose **Install Helper…** and approve Guillotine under macOS **Login Items & Extensions → Allow in the Background**. Keep the app in Applications. Administrator approval is required by macOS; approval does not establish reliable closed-lid streaming.
+3. Choose **Enable Guillotine**. Activation requires working power notifications, a registered restore shortcut, both physical controls, and, when selected, a working privileged lease. Failed activation restores owned changes and reports an error.
 4. Restore with **Control–Option–Command–Space**, the menu, or Quit. Fn is optional locally; the inspected Vibepollo source does not forward it. Lock-screen/Secure Input shortcut delivery is not yet certified. Normal lock and authentication remain in force.
 5. Lock never changes the active mode. Sleep/wake restoration is optional and off by default. With closed-lid support off, sleep follows the user’s policy. With it on, the global sleep block lasts until restoration.
 6. Unplugging restores unless battery use is allowed. Turning battery use off on battery restores immediately. Reconnecting never reactivates. Launch/login starts restored.
@@ -38,7 +40,7 @@ Guillotine leaves display layout, virtual displays, network interfaces, streamin
 
 **Mute built-in speakers while headless** in the menu is optional and off by default. It applies within one second while headless, and unchecking it restores the prior mute state. Volume and routing stay unchanged; virtual, aggregate, USB, HDMI, and Bluetooth outputs are excluded. This silences playback through built-in audio; it does not claim to power down the audio hardware or mute remote streaming audio. Already-muted speakers stay muted. The guard journals changes by stable device UID and restores them on disable, quit, power-policy cutoff, or lease expiry; killed-guard recovery runs when the app reopens. A current unmuted value is preserved during restoration. Identical mute writes from another app cannot be distinguished. During a session, the guard reapplies mute once per second.
 
-Transitions or keyboard activity may briefly light the hardware before the guard reapplies off on its next one-second tick. Status indicates ownership, not an electrical power measurement.
+Panel power-off is requested once per activation, and power-on at restoration. Lid opening, wake, or other macOS display transitions may turn the panel back on; Guillotine does not fight those transitions. Restore and enable again to request panel-off again. Keyboard backlight and optional speaker mute remain periodically enforced. Status indicates ownership, not an electrical power measurement.
 
 The disable shortcut also requests built-in panel power-on when Guillotine already reports OFF. This explicit rescue helps if the physical panel stayed dark after a stream ended; it does not change logical display layout. Ordinary startup recovery only restores owned state.
 

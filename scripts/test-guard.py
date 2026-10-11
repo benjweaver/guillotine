@@ -112,6 +112,48 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.panel_requests(), '0\n0\n')
         child.stdin.close(); self.restored(child)
         self.assertEqual(self.panel_requests(), '0\n0\n1\n')
+    def enable_panel_event(self, child, configuration):
+        (self.folder / 'test-display-configuration').write_text(configuration)
+        child.stdin.write(b'test-panel-enabled\n'); child.stdin.flush()
+    def test_builtin_enable_bypasses_settling_and_cooldown_without_repeats(self):
+        child = self.start(); self.ready(child)
+        started = time.monotonic()
+        self.enable_panel_event(child, 'built-in enabled')
+        self.wait_panel_requests(child, '0\n0\n')
+        self.assertLess(time.monotonic() - started, .75)
+        # A duplicate enable callback is not a new transition.
+        self.enable_panel_event(child, 'built-in enabled')
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+    def test_builtin_enable_cancels_pending_settled_write(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-display-wake').touch()
+        self.hold_lease(child, 1.2)
+        self.enable_panel_event(child, 'built-in enabled after wake')
+        self.wait_panel_requests(child, '0\n0\n')
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+    def test_virtual_callback_first_does_not_delay_builtin_enable(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-display-configuration').write_text('built-in enabled, virtual removed')
+        started = time.monotonic()
+        child.stdin.write(b'test-display-changed\ntest-panel-enabled\n'); child.stdin.flush()
+        self.wait_panel_requests(child, '0\n0\n')
+        self.assertLess(time.monotonic() - started, .75)
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+    def test_builtin_enable_respects_lid_and_sleep_suppression(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-lid').write_text('closed')
+        self.enable_panel_event(child, 'built-in enabled with lid shut')
+        self.hold_lease(child, 1.2)
+        self.assertEqual(self.panel_requests(), '0\n')
+        (self.folder / 'test-system-notification').write_text('sleep')
+        self.hold_lease(child, 1.2)
+        (self.folder / 'test-lid').write_text('open')
+        self.enable_panel_event(child, 'built-in enabled during sleep')
+        self.hold_lease(child, 1.2)
+        self.assertEqual(self.panel_requests(), '0\n')
     def test_display_change_burst_coalesces_into_one_request(self):
         child = self.start(); self.ready(child)
         configuration = self.folder / 'test-display-configuration'

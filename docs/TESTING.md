@@ -137,3 +137,17 @@ the panel. The guard logged event-driven off requests at 02:48:30, 02:48:33,
 and 02:48:36 during disconnect/reconnect, at least three seconds apart. No
 recurring panel requests followed the settled transitions. Closed-lid operation
 remains experimental and is not certified by this test.
+
+## Build 18 immediate built-in enable handling
+
+Build 17 returned the panel dark after disconnect, but the user observed a
+one-second flash. The intentional settling delay delayed even the explicit
+built-in display enable event. Build 18 handles that edge immediately on the
+main queue, cancels an older pending write, and retains settling for other
+layout/wake events. Tests cover bypassing settling/cooldown, duplicate enable
+callbacks, cancellation of pending work, virtual callbacks arriving first,
+and lid/system-sleep suppression. All 51 fake guard cases pass against the final
+universal build. The Developer ID signature and nested signatures verified,
+and build 18 was installed locally with controls restored and the app disabled.
+Hardware acceptance pending; notification latency may still permit a brief
+flash before Guillotine receives the event. No release has been published.

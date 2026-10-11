@@ -3,8 +3,9 @@ GUILLOTINE — OFF WITH THE HEAD
 Enable Guillotine requests built-in panel power-off and turns off the
 keyboard backlight while retaining the logical display. It never substitutes
 screen brightness zero. Keyboard zero readback is verified; auto-brightness
-is unchanged. With the lid open, display layout changes and wake schedule one
-panel-off request after events settle. Transitions may briefly relight it.
+is unchanged. With the lid open, built-in display enable events request off
+immediately; other display changes and wake wait for events to settle. macOS
+may briefly relight the panel before delivering the notification.
 Duplicate layouts and periodic ticks do not request panel power. Closed or
 unknown lid state and system sleep suppress event-driven reapplication.
 Private APIs require revalidation after macOS updates.

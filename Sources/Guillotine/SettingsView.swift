@@ -229,7 +229,7 @@ struct SettingsView: View {
                 Button("Approve in Login Items…") { SMAppService.openSystemSettingsLoginItems() }
             }
             if let error = preferences.loginError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
-            Text("Panel power and keyboard backlight controls use private macOS APIs. Panel-off is requested when enabled and after settled display changes or wake with the lid open; transitions may briefly relight it. Caffeine can handle sleep prevention independently. Lock does not change the mode. Lock-screen hotkey delivery needs testing; Mac sleep still interrupts streaming normally.")
+            Text("Panel power and keyboard backlight controls use private macOS APIs. With the lid open, panel-off is requested immediately when macOS re-enables the built-in display; other display changes and wake wait for events to settle. Caffeine can handle sleep prevention independently. Lock does not change the mode. Lock-screen hotkey delivery needs testing; Mac sleep still interrupts streaming normally.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(24)

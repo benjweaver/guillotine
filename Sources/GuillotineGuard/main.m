@@ -37,6 +37,7 @@ static NSInteger sleepBelow=10, lowPowerBelow;
 static io_connect_t powerConnection;
 static NSString *directory;
 static NSArray *lastDisplayConfiguration;
+static NSArray *lastPanelEnableConfiguration;
 static NSTimer *panelReapplyTimer;
 static NSTimeInterval lastPanelOff;
 static BOOL systemSleeping;
@@ -310,6 +311,17 @@ static NSArray *displayConfiguration(void) {
     }
     return @[configuration];
 }
+static void reapplyPanelOff(NSString *reason) {
+    if (!ready || finished || systemSleeping || !lidIsOpen()) return;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
+        finish(0,@"Remote restoration requested");
+    }
+    if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
+    enforcePolicy();
+    if (!requestPanelPower(0)) finish(2,@"Panel power control failed after display transition");
+    lastPanelOff=NSProcessInfo.processInfo.systemUptime;
+    NSLog(@"Panel-off requested after %@",reason);
+}
 static void schedulePanelOff(void) {
     if (!ready || finished) return;
     [panelReapplyTimer invalidate];
@@ -318,27 +330,39 @@ static void schedulePanelOff(void) {
     NSTimeInterval delay=MAX(1,3-(NSProcessInfo.processInfo.systemUptime-lastPanelOff));
     panelReapplyTimer=[NSTimer scheduledTimerWithTimeInterval:delay repeats:NO block:^(NSTimer *timer){
         panelReapplyTimer=nil;
-        if (finished || systemSleeping || !lidIsOpen()) return;
-        if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
-            finish(0,@"Remote restoration requested");
-        }
-        if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
-        enforcePolicy();
-        if (!requestPanelPower(0)) finish(2,@"Panel power control failed after display transition");
-        lastPanelOff=NSProcessInfo.processInfo.systemUptime;
-        NSLog(@"Panel-off requested after settled display transition");
+        reapplyPanelOff(@"settled display transition");
     }];
 }
-static void displayConfigurationChanged(void) {
-    NSArray *configuration=displayConfiguration();
-    if (!configuration || [configuration isEqual:lastDisplayConfiguration]) return;
-    lastDisplayConfiguration=configuration;
-    schedulePanelOff();
+static void handleDisplayConfiguration(NSArray *configuration, BOOL panelEnabled) {
+    if (!configuration) return;
+    BOOL changed=![configuration isEqual:lastDisplayConfiguration];
+    if (changed) lastDisplayConfiguration=configuration;
+    if (panelEnabled) {
+        // A real built-in enable edge needs no settling/cooldown delay. Its
+        // changed layout deduplicates callbacks, and our power request does
+        // not alter that layout. No recurring write or retry is scheduled.
+        // A virtual display's callback can report this same layout first.
+        // Deduplicate enable edges separately so callback order cannot defer it.
+        if ([configuration isEqual:lastPanelEnableConfiguration]) return;
+        lastPanelEnableConfiguration=configuration;
+        [panelReapplyTimer invalidate]; panelReapplyTimer=nil;
+        reapplyPanelOff(@"built-in display enabled");
+    } else if (changed) {
+        lastPanelEnableConfiguration=nil;
+        schedulePanelOff();
+    }
+}
+static void displayConfigurationChanged(BOOL panelEnabled) {
+    handleDisplayConfiguration(displayConfiguration(),panelEnabled);
 }
 static void displayReconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags flags, void *context) {
     if (flags & kCGDisplayBeginConfigurationFlag) return;
     // Apple requires callbacks to avoid changing display configuration inline.
-    dispatch_async(dispatch_get_main_queue(),^{ displayConfigurationChanged(); });
+    BOOL panelEnabled=(flags & (kCGDisplayAddFlag | kCGDisplayEnabledFlag)) && CGDisplayIsBuiltin(display);
+    // Capture the completed layout now: a subsequent reconfiguration may
+    // already be underway when the queued write runs.
+    NSArray *configuration=displayConfiguration();
+    dispatch_async(dispatch_get_main_queue(),^{ handleDisplayConfiguration(configuration,panelEnabled); });
 }
 static BOOL loadHardware(BOOL needsPanel, NSString **error) {
     if (fake) return YES;
@@ -464,6 +488,10 @@ int main(int argc, char **argv) { @autoreleasepool {
                 NSUInteger length=(NSUInteger)(newline-buffer);
                 NSString *message=[[NSString alloc] initWithBytes:buffer length:length encoding:NSUTF8StringEncoding];
                 [pending replaceBytesInRange:NSMakeRange(0,length+1) withBytes:NULL length:0];
+                if (fake && ([message isEqualToString:@"test-panel-enabled"] || [message isEqualToString:@"test-display-changed"])) {
+                    displayConfigurationChanged([message isEqualToString:@"test-panel-enabled"]);
+                    continue;
+                }
                 if (![message hasPrefix:@"renew"]) continue;
                 if ([message containsString:@"battery=0"]) allowBattery=NO;
                 else if ([message containsString:@"battery=1"]) allowBattery=YES;
@@ -493,6 +521,7 @@ int main(int argc, char **argv) { @autoreleasepool {
     NSNotificationCenter *workspace=NSWorkspace.sharedWorkspace.notificationCenter;
     [workspace addObserverForName:NSWorkspaceWillSleepNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){
         systemSleeping=YES;
+        lastPanelEnableConfiguration=nil;
         [panelReapplyTimer invalidate]; panelReapplyTimer=nil;
         if (restoreSleep) finish(0,@"Sleep restoration enabled");
         else { sleepPending=YES; deadline=NSProcessInfo.processInfo.systemUptime+8; }
@@ -513,7 +542,7 @@ int main(int argc, char **argv) { @autoreleasepool {
         NSString *failure=nil;
         if (!maintainControls(&failure)) finish(2,failure);
         if (fake) {
-            displayConfigurationChanged();
+            displayConfigurationChanged(NO);
             NSString *wake=[directory stringByAppendingPathComponent:@"test-display-wake"];
             if ([[NSFileManager defaultManager] fileExistsAtPath:wake]) {
                 [[NSFileManager defaultManager] removeItemAtPath:wake error:nil];

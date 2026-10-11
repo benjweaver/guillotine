@@ -6,7 +6,7 @@ All notable changes are documented here using Keep a Changelog.
 
 ### Fixed
 
-- Reapply panel-off after settled display layout changes and wake while the lid is open, including remote display disconnection. Coalesce event bursts and ignore duplicate layouts instead of sending recurring panel requests.
+- Reapply panel-off after settled display layout changes and wake while the lid is open, including remote display disconnection. Handle built-in display enable events immediately to avoid the intentional one-second delay at disconnect. Coalesce other event bursts and ignore duplicate layouts instead of sending recurring panel requests.
 
 ### Changed
 

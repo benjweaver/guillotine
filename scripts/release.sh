@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Local Developer ID signing and notarization; requires Xcode, Python 3, and gh.
 set -euo pipefail
 cd "$(dirname "$0")/.."

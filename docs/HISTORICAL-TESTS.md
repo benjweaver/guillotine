@@ -17,7 +17,7 @@ Host: Apple Silicon, macOS 27.0.1 (26A434), Xcode 27.0 beta (27A5252f), Swift 6.
 - Re-ran the renamed target's XCTest suite: **15 passed, zero failures**.
 - Universal Release build succeeded using **Developer ID Application: Ben Weaver (AR25V66TVY)**, secure timestamp and hardened runtime. `codesign --verify --deep --strict` passed, including after installation to `/Applications/Guillotine.app`. Both arm64 and x86_64 slices are present.
 - Launched the installed signed app. Visually checked Settings, shared guillotine artwork, OFF → ON → OFF, and the filled-blade/indicator-dot active state. Left running OFF with launch at login OFF for user testing.
-- Full GPL v3 license is bundled with the app and source; code and original artwork are GPL-3.0-only. This local build is signed but has not been notarized.
+- Full GPL v3 license is bundled with the app and source; code and original artwork are GPL-3.0-or-later. This local build is signed but has not been notarized.
 - Earlier host and guest checks below were performed under the original Nightjar branding; historical process names and screenshots should be interpreted accordingly. The behavior is unchanged.
 
 ## UTM macOS VM

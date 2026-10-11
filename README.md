@@ -83,7 +83,7 @@ python3 scripts/test-guard.py build/Build/Products/Debug/GuillotineGuard
 python3 scripts/test-lid-helper.py build/Build/Products/Debug/GuillotineLidHelper
 ```
 
-Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-only; see LICENSE. Repository visibility is controlled by Ben.
+Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-or-later; see LICENSE. Repository visibility is controlled by Ben.
 
 ## Release
 

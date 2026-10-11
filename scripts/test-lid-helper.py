@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Fake pmset only: lifecycle and compare-and-restore tests, never root writes."""
 import pathlib, plistlib, subprocess, sys, tempfile, time, unittest
 HELPER=str(pathlib.Path(sys.argv.pop(1)).resolve())

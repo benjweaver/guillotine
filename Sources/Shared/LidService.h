@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0-or-later
 #import <Foundation/Foundation.h>
 #define GUILLOTINE_LID_SERVICE @"dev.guillotine.LidHelper"
 #define GUILLOTINE_GUARD_REQUIREMENT @"anchor apple generic and identifier \"GuillotineGuard\" and certificate leaf[subject.OU] = \"AR25V66TVY\""

@@ -34,6 +34,44 @@ class GuardTests(unittest.TestCase):
     def restored(self, child):
         self.assertEqual(child.wait(timeout=10), 0)
         self.assertFalse((self.folder / 'hardware-session.plist').exists())
+    def test_battery_requires_opt_in(self):
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start()
+        self.assertTrue(child.stdout.readline().startswith(b'ERROR Battery'))
+        self.assertEqual(child.wait(timeout=2), 2)
+        self.assertFalse((self.folder / 'hardware-session.plist').exists())
+    def test_unplug_restores_without_battery_opt_in(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-power').write_text('battery')
+        self.restored(child)
+    def test_allowed_battery_stays_active_until_thermal_cutout(self):
+        child = self.start('--allow-battery', '--closed-lid'); self.ready(child)
+        (self.folder / 'test-power').write_text('battery')
+        child.stdin.write(b'renew battery=1\n'); child.stdin.flush()
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        (self.folder / 'test-hot').touch()
+        self.restored(child)
+        self.assertTrue((self.folder / 'test-sleep-request').exists())
+    def test_thermal_on_ac_does_not_request_sleep(self):
+        child = self.start('--closed-lid'); self.ready(child)
+        (self.folder / 'test-hot').touch()
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        child.stdin.close(); self.restored(child)
+        self.assertFalse((self.folder / 'test-sleep-request').exists())
+    def test_disabling_battery_policy_restores_active_guard(self):
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery'); self.ready(child)
+        child.stdin.write(b'renew battery=0\n'); child.stdin.flush()
+        self.restored(child)
+    def test_closed_lid_ownership_is_journaled_and_recovered(self):
+        import plistlib
+        child = self.start('--closed-lid'); self.ready(child)
+        state = plistlib.loads((self.folder / 'hardware-session.plist').read_bytes())
+        self.assertTrue(state['lidOwned'])
+        child.kill(); child.wait(timeout=2)
+        recovered = self.start('--recover')
+        self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
+        self.restored(recovered)
     def test_app_disconnect_restores(self):
         child = self.start(); self.ready(child)
         child.stdin.close(); self.restored(child)

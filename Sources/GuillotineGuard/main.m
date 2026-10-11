@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Ben Weaver and Guillotine contributors
 #import <AppKit/AppKit.h>
 #import <IOKit/IOKitLib.h>
+#import <IOKit/pwr_mgt/IOPMLib.h>
+#import <IOKit/pwr_mgt/IOPMLibDefs.h>
 #import <IOKit/ps/IOPowerSources.h>
 #import <IOKit/ps/IOPSKeys.h>
 #import <dlfcn.h>
@@ -27,6 +29,9 @@ static NSString *journal, *restoreRequest;
 static BOOL fake, finished, ready, restoreSleep, restoreWake, sleepPending;
 static NSTimeInterval deadline;
 static int lockFD;
+static BOOL allowBattery, closedLid;
+static io_connect_t powerConnection;
+static NSString *directory;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
 static BOOL saveJournal(void) {
     if (![saved writeToFile:journal atomically:YES]) return NO;
@@ -34,6 +39,33 @@ static BOOL saveJournal(void) {
     BOOL ok=descriptor>=0 && fsync(descriptor)==0;
     if (descriptor>=0) close(descriptor);
     return ok;
+}
+static BOOL externalPower(void) {
+    if (fake) {
+        NSString *value=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"test-power"] encoding:NSUTF8StringEncoding error:nil];
+        return ![value isEqualToString:@"battery"];
+    }
+    CFTypeRef info=IOPSCopyPowerSourcesInfo(); if (!info) return NO;
+    CFStringRef type=IOPSGetProvidingPowerSourceType(info);
+    BOOL ac=type && CFEqual(type,CFSTR(kIOPSACPowerValue)); CFRelease(info); return ac;
+}
+static BOOL tooHot(void) {
+    if (fake) return [[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-hot"]];
+    return NSProcessInfo.processInfo.thermalState>=NSProcessInfoThermalStateSerious;
+}
+static IOReturn lidControl(BOOL disable) {
+    if (fake) return KERN_SUCCESS;
+    if (!powerConnection) powerConnection=IOPMFindPowerManagement(MACH_PORT_NULL);
+    uint64_t value=disable?1:0;
+    return IOConnectCallScalarMethod(powerConnection,kPMSetClamshellSleepState,&value,1,NULL,NULL);
+}
+static BOOL lidCausesSleep(void) {
+    if (fake) return YES;
+    io_registry_entry_t root=IORegistryEntryFromPath(kIOMainPortDefault,"IOPower:/IOPowerConnection/IOPMrootDomain");
+    if (!root) root=IOServiceGetMatchingService(kIOMainPortDefault,IOServiceMatching("IOPMrootDomain"));
+    id value=CFBridgingRelease(IORegistryEntryCreateCFProperty(root,CFSTR("AppleClamshellCausesSleep"),NULL,0));
+    IOObjectRelease(root);
+    return !value || [value boolValue];
 }
 static BOOL restore(void) {
     BOOL ok=YES;
@@ -45,16 +77,47 @@ static BOOL restore(void) {
         if (!fake && [keyboard brightnessForKeyboard:kid] <= 0.00001f)
             ok=[keyboard setBrightness:[values[key] floatValue] forKeyboard:kid] && ok;
     }
+    // The shared private bit is touched only if this session changed a sleep-causing policy.
+    if ([saved[@"lidOwned"] boolValue]) ok=(lidControl(NO)==KERN_SUCCESS) && ok;
     if (ok) [[NSFileManager defaultManager] removeItemAtPath:journal error:nil];
     return ok;
 }
 static void finish(int code, NSString *reason) {
     if (finished) return; finished=YES;
     BOOL restored=restore();
+    [reason writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
     emit([NSString stringWithFormat:@"STOP %@%@",reason,restored?@"":@"; restoration failed; reopen Guillotine to retry"]);
     exit(restored?code:3);
 }
+static void thermalCutout(void) {
+    if (finished) return; finished=YES;
+    BOOL restored=restore();
+    [@"Thermal cutout: controls restored; system sleep requested." writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    if (fake) {
+        [@"sleep" writeToFile:[directory stringByAppendingPathComponent:@"test-sleep-request"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        emit(@"STOP Thermal cutout: restored before sleep request"); exit(restored?0:3);
+    }
+    if (!powerConnection) powerConnection=IOPMFindPowerManagement(MACH_PORT_NULL);
+    IOReturn result=IOPMSleepSystem(powerConnection);
+    NSString *outcome=[NSString stringWithFormat:@"Thermal cutout: restoration %@; sleep request %@ (0x%x).",restored?@"succeeded":@"failed",result==KERN_SUCCESS?@"accepted":@"rejected",result];
+    [outcome writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    emit([@"STOP " stringByAppendingString:outcome]);
+    exit(restored && result==KERN_SUCCESS?0:3);
+}
+static void enforcePolicy(void) {
+    if (externalPower()) return;
+    if (tooHot()) thermalCutout();
+    if (!allowBattery) finish(0,@"External power disconnected; battery use is disabled");
+}
+static void powerChanged(void *context) { if (ready) enforcePolicy(); }
 static BOOL applyOff(NSString **error) {
+    enforcePolicy();
+    if (closedLid && lidCausesSleep()) {
+        saved[@"lidOwned"]=@YES;
+        if (!saveJournal() || lidControl(YES)!=KERN_SUCCESS) {
+            *error=@"Closed-lid control was rejected. Disable the experimental option or use native clamshell hardware."; return NO;
+        }
+    }
     NSMutableDictionary *values=saved[@"keyboards"];
     for (NSString *key in values.allKeys) {
         uint64_t kid=key.longLongValue;
@@ -103,9 +166,11 @@ int main(int argc, char **argv) { @autoreleasepool {
     signal(SIGPIPE,SIG_IGN);
     NSArray *args=NSProcessInfo.processInfo.arguments;
     fake=[args containsObject:@"--test-guard"];
+    allowBattery=[args containsObject:@"--allow-battery"];
+    closedLid=[args containsObject:@"--closed-lid"];
     restoreSleep=[args containsObject:@"--restore-on-sleep"];
     restoreWake=[args containsObject:@"--restore-on-wake"];
-    NSString *directory=fake?args.lastObject:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Guillotine"];
+    directory=fake?args.lastObject:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Guillotine"];
     [[NSFileManager defaultManager] createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:@{NSFilePosixPermissions:@0700} error:nil];
     journal=[directory stringByAppendingPathComponent:@"hardware-session.plist"];
     restoreRequest=[directory stringByAppendingPathComponent:@"restore.request"];
@@ -123,6 +188,7 @@ int main(int argc, char **argv) { @autoreleasepool {
     saved=[[NSDictionary dictionaryWithContentsOfFile:journal] mutableCopy];
     if (saved && !restore()) { emit(@"ERROR Previous hardware session could not be restored. Restart macOS or retry."); return 3; }
     if ([args containsObject:@"--recover"] || [args containsObject:@"--restore"]) { emit(@"RECOVERED"); return 0; }
+    if (!externalPower() && (!allowBattery || tooHot())) { emit(@"ERROR Battery use is disabled or macOS thermal pressure is too high. Connect power or wait for cooling."); return 2; }
     NSMutableDictionary *values=[NSMutableDictionary dictionary];
     NSArray *ids=fake?@[@1]:[keyboard copyKeyboardBacklightIDs];
     for (NSNumber *kid in ids) {
@@ -133,6 +199,10 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!values.count) { emit(@"ERROR No supported backlit keyboard found."); return 2; }
     saved=[@{@"panelOwned":@YES,@"keyboards":values} mutableCopy];
     if (!saveJournal()) { emit(@"ERROR Could not save restoration journal; nothing changed."); return 2; }
+    CFRunLoopSourceRef power=IOPSNotificationCreateRunLoopSource(powerChanged,NULL);
+    if (!power && !fake) finish(2,@"Power notification setup failed");
+    if (power) CFRunLoopAddSource(CFRunLoopGetMain(),power,kCFRunLoopCommonModes);
+    [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ if (ready) enforcePolicy(); }];
     if (!applyOff(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
     ready=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
     emit(@"READY");
@@ -141,7 +211,13 @@ int main(int argc, char **argv) { @autoreleasepool {
     dispatch_source_set_event_handler(input,^{
         char bytes[128]; ssize_t n=read(STDIN_FILENO,bytes,sizeof(bytes));
         if (n==0) finish(0,@"App disconnected");
-        if (n>0) { deadline=NSProcessInfo.processInfo.systemUptime+5; }
+        if (n>0) {
+            NSString *message=[[NSString alloc] initWithBytes:bytes length:n encoding:NSUTF8StringEncoding];
+            if ([message containsString:@"battery=0"]) allowBattery=NO;
+            else if ([message containsString:@"battery=1"]) allowBattery=YES;
+            deadline=NSProcessInfo.processInfo.systemUptime+5;
+            enforcePolicy();
+        }
     }); dispatch_resume(input);
     for (NSNumber *number in @[@(SIGTERM),@(SIGINT)]) {
         int sig=number.intValue; signal(sig,SIG_IGN);

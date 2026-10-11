@@ -3,9 +3,9 @@ GUILLOTINE — OFF WITH THE HEAD
 Cut Screen & Keyboard switches off the built-in Apple Silicon panel and
 keyboard backlight while leaving the logical display connected.
 
-Sleep is independent. Guillotine never prevents sleep or changes sleep
-settings. Caffeine and streaming hosts can continue running their own policy.
-Leave the lid open or establish native clamshell operation separately.
+Ordinary idle sleep stays independent. Caffeine and streaming hosts retain
+their own policy. Optional closed-lid control affects lid sleep; the mandatory
+battery thermal cutout restores controls and requests system sleep.
 
 Restore: Control–Option–Command–Space. Fn is optional in Settings; the local
 Vibepollo input source does not currently forward Fn. Lock-screen and Secure
@@ -19,11 +19,20 @@ value is journaled for restoration. Keyboard auto-brightness is not changed.
 No virtual display is created or altered. Real capture compatibility still
 requires a progressing-frame/input test on the exact streaming stack.
 
-Works on battery or external power; plugging/unplugging preserves the mode.
+Battery use is optional and off by default. Unplugging restores unless Allow on
+battery is enabled. Turning it off on battery restores immediately. Replugging
+never activates. Serious/critical macOS thermal pressure on battery restores
+controls and requests system sleep; no Celsius sensor is claimed.
 App quit/crash or a five-second lease expiry restores
 physical controls through a bundled nonprivileged guard. If the guard itself
 is killed, reopen Guillotine to recover its journal. If recovery fails,
 restart macOS. There is no root service or SIP change.
+
+Optional closed-lid control uses a shared private kernel bit, not an idle-sleep
+assertion. It is experimental and needs a physical lid/capture test on this Mac.
+It does not change persistent pmset settings; no privileged fallback is installed.
+Concurrent lid utilities cannot be perfectly distinguished. A virtual display or
+adapter may still be needed for streaming after lid closure.
 
 Supported: Apple Silicon MacBook, macOS 13+. Intel/desktop/external panel power
 control is unavailable. Launch always starts restored. Login remains normal.

@@ -25,6 +25,7 @@ import Carbon
     }
     private func make(_ assertion: Assertion, read: @escaping () -> PowerState = { .external }) -> SessionController {
         let controller = SessionController(controls: assertion, readPower: read)
+        controller.allowBattery = true
         controller.monitoringAvailable = true
         controller.shortcutAvailable = true
         return controller
@@ -102,18 +103,36 @@ import Carbon
         XCTAssertEqual(assertion.releases, 100)
         XCTAssertFalse(assertion.owned)
     }
-    func testNotificationsAreOptionalButShortcutIsRequired() {
+    func testMissingNotificationsOrShortcutBlocksActivation() {
         let assertion = Assertion()
         let controller = make(assertion)
         controller.monitoringAvailable = false
         controller.enable()
-        XCTAssertTrue(controller.enabled)
-        controller.disable()
+        XCTAssertFalse(controller.enabled)
         controller.monitoringAvailable = true
         controller.shortcutAvailable = false
         controller.enable()
         XCTAssertFalse(controller.enabled)
-        XCTAssertEqual(assertion.acquisitions, 1)
+        XCTAssertEqual(assertion.acquisitions, 0)
+    }
+    func testBatteryIsOptInAndPolicyChangesRestoreImmediately() {
+        let assertion = Assertion()
+        let controller = SessionController(controls: assertion, readPower: { .battery })
+        controller.monitoringAvailable = true; controller.shortcutAvailable = true
+        XCTAssertFalse(controller.allowBattery)
+        controller.enable(); XCTAssertFalse(controller.enabled)
+        controller.allowBattery = true; controller.enable(); XCTAssertTrue(controller.enabled)
+        controller.allowBattery = false; XCTAssertFalse(controller.enabled)
+        XCTAssertEqual(assertion.releases, 1)
+    }
+    func testUnplugRestoresWhenBatteryDisabledAndReplugStaysOff() {
+        let assertion = Assertion()
+        let controller = make(assertion)
+        controller.allowBattery = false
+        controller.enable(); XCTAssertTrue(controller.enabled)
+        controller.powerChanged(.battery); XCTAssertFalse(controller.enabled)
+        controller.powerChanged(.external); XCTAssertFalse(controller.enabled)
+        XCTAssertEqual(assertion.releases, 1)
     }
     func testAcquireFailureLeavesNoEnabledState() {
         let assertion = Assertion()

@@ -29,6 +29,12 @@ import AppKit
         session.onChange = { [weak self] in self?.updateIcon() }
         monitor.onChange = { [weak self] value in self?.session.powerChanged(value) }
         session.monitoringAvailable = monitor.start()
+        session.allowBattery = preferences.allowBattery
+        controls.allowBattery = preferences.allowBattery
+        preferences.batteryPolicyChanged = { [weak self] allowed in
+            self?.controls.allowBattery = allowed
+            self?.session.allowBattery = allowed
+        }
         session.refreshPower()
         preferences.applyShortcut = { [weak self] candidate in
             guard let self else { return }
@@ -39,7 +45,7 @@ import AppKit
             try shortcut.register(preferences.shortcut)
             session.shortcutAvailable = true
         } catch { preferences.shortcutError = error.localizedDescription }
-        controls.onStopped = { [weak self] in self?.session.disable(reason: "Physical controls restored by hardware guard.") }
+        controls.onStopped = { [weak self] reason in self?.session.disable(reason: reason) }
         do { try controls.recover() }
         catch { session.reportError(error.localizedDescription) }
         updateIcon()
@@ -64,7 +70,8 @@ import AppKit
         menu.addItem(toggle)
         add(session.power.label, to: menu)
         add(DisplayStatus.summary, to: menu)
-        add("Sleep settings and Caffeine remain independent", to: menu)
+        add(preferences.closedLid ? "Closed lid: experimental override requested" : "Closed lid: normal macOS policy", to: menu)
+        add(preferences.allowBattery ? "Battery allowed • thermal cutout active" : "Battery disabled • unplug restores", to: menu)
         if let error = session.error {
             let item = NSMenuItem()
             item.view = NSHostingView(rootView: Text(error).font(.caption).foregroundStyle(.red).frame(width: 290, alignment: .leading).padding(10))
@@ -90,6 +97,8 @@ import AppKit
     }
     @objc private func toggleMode() {
         if session.enabled { session.disable() } else {
+            controls.allowBattery = preferences.allowBattery
+            controls.closedLid = preferences.closedLid
             controls.restoreOnSleep = preferences.restoreOnSleep
             controls.restoreOnWake = preferences.restoreOnWake
             session.enable()

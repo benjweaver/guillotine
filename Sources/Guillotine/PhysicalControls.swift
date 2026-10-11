@@ -7,9 +7,15 @@ import Darwin
     private var process: Process?
     private var lease: FileHandle?
     private var heartbeat: Timer?
+    var allowBattery = false
+    var closedLid = false
     var restoreOnSleep = false
     var restoreOnWake = false
-    var onStopped: (() -> Void)?
+    var onStopped: ((String) -> Void)?
+    private var stopReason: String {
+        let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Guillotine/last-stop.txt")
+        return (try? String(contentsOf: file, encoding: .utf8)) ?? "Physical controls restored by hardware guard."
+    }
 
     private var executable: URL {
         Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/GuillotineGuard")
@@ -30,7 +36,7 @@ import Darwin
         signal(SIGPIPE, SIG_IGN)
         let child = Process(), input = Pipe(), output = Pipe()
         child.executableURL = executable
-        child.arguments = (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
+        child.arguments = (allowBattery ? ["--allow-battery"] : []) + (closedLid ? ["--closed-lid"] : []) + (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
         child.standardInput = input; child.standardOutput = output
         child.standardError = FileHandle.nullDevice
         try child.run()
@@ -49,14 +55,14 @@ import Darwin
         child.terminationHandler = { [weak self] stopped in
             Task { @MainActor in
                 guard let self, self.process === stopped else { return }
-                self.onStopped?()
+                self.onStopped?(self.stopReason)
             }
         }
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                do { try self.lease?.write(contentsOf: Data("renew\n".utf8)) }
-                catch { self.onStopped?() }
+                do { try self.lease?.write(contentsOf: Data("renew battery=\(self.allowBattery ? 1 : 0)\n".utf8)) }
+                catch { self.onStopped?(self.stopReason) }
             }
         }
         if let heartbeat { RunLoop.main.add(heartbeat, forMode: .common) }

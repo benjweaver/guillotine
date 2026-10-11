@@ -29,6 +29,7 @@ enum PowerState: String, Equatable {
     @Published private(set) var power: PowerState = .unknown
     @Published private(set) var message = "Physical controls start restored. Sleep policy is independent."
     @Published private(set) var error: String?
+    var allowBattery = false { didSet { refreshPower() } }
     var monitoringAvailable = false
     var shortcutAvailable = false
     var onChange: (() -> Void)?
@@ -45,6 +46,7 @@ enum PowerState: String, Equatable {
 
     func powerChanged(_ value: PowerState) {
         power = value
+        if enabled && !allowBattery && value != .external { disable(reason: "Restored: battery operation is disabled.") }
         onChange?()
     }
 
@@ -56,10 +58,13 @@ enum PowerState: String, Equatable {
             return
         }
         power = readPower()
+        guard monitoringAvailable else { fail("Power notifications unavailable. Reopen Guillotine."); return }
+        guard allowBattery || power == .external else { fail("Connect power or enable Allow on battery in Settings."); return }
         do {
             try controls.acquire()
             enabled = true
             power = readPower()
+            if !allowBattery && power != .external { disable(reason: "Restored: power disconnected during activation."); return }
             message = "Built-in panel power and keyboard backlight off requested. Sleep settings unchanged."
             onChange?()
         } catch {

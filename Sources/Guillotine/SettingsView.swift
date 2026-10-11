@@ -16,6 +16,13 @@ import ServiceManagement
     @Published var restoreOnWake = UserDefaults.standard.bool(forKey: "restoreOnWake") {
         didSet { UserDefaults.standard.set(restoreOnWake, forKey: "restoreOnWake") }
     }
+    var batteryPolicyChanged: ((Bool) -> Void)?
+    @Published var allowBattery = UserDefaults.standard.bool(forKey: "allowBattery") {
+        didSet { UserDefaults.standard.set(allowBattery, forKey: "allowBattery"); batteryPolicyChanged?(allowBattery) }
+    }
+    @Published var closedLid = UserDefaults.standard.bool(forKey: "closedLid") {
+        didSet { UserDefaults.standard.set(closedLid, forKey: "closedLid") }
+    }
     var applyShortcut: ((Shortcut) throws -> Void)?
 
     func changeShortcut(_ candidate: Shortcut) {
@@ -97,6 +104,10 @@ struct SettingsView: View {
             }
             Divider()
             VStack(alignment: .leading, spacing: 6) {
+                Toggle("Allow on battery", isOn: $preferences.allowBattery)
+                Text("Off by default. When off, unplugging restores immediately. Battery sessions restore and request sleep at serious or critical macOS thermal pressure.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Allow closed-lid operation (experimental)", isOn: $preferences.closedLid)
+                Text("Uses the private lid-sleep control, without changing pmset settings. Requires physical testing on this Mac; remote capture may still need a virtual display or adapter. Applies next activation.").font(.caption).foregroundStyle(.secondary)
                 Text("Stay headless across lock, sleep and wake by default.").font(.caption)
                 Toggle("Restore physical controls when sleeping", isOn: $preferences.restoreOnSleep)
                 Toggle("Restore physical controls when waking", isOn: $preferences.restoreOnWake)

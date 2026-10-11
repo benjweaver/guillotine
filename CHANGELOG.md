@@ -10,7 +10,7 @@ All notable changes are documented here using Keep a Changelog.
 
 ### Changed
 
-- Relicensed from GPL-3.0-only to GPL-3.0-or-later, matching Ben's other apps.
+- Relicensed from GPL-3.0-only to GPL-3.0-or-later.
 
 ## [1.0.1] - 2026-10-11
 

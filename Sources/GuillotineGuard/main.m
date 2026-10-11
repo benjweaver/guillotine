@@ -12,6 +12,7 @@
 #import <unistd.h>
 #import <float.h>
 #import <math.h>
+#import "../Shared/LidService.h"
 
 // Private API declarations verified against upstream implementations; resolved at runtime.
 @interface NSObject (GuillotineKeyboard)
@@ -59,13 +60,26 @@ static IOReturn lidControl(BOOL disable) {
     uint64_t value=disable?1:0;
     return IOConnectCallScalarMethod(powerConnection,kPMSetClamshellSleepState,&value,1,NULL,NULL);
 }
-static BOOL lidCausesSleep(void) {
+static NSXPCConnection *lidConnection;
+static BOOL lidServiceCall(BOOL releasing, NSString **error) {
     if (fake) return YES;
-    io_registry_entry_t root=IORegistryEntryFromPath(kIOMainPortDefault,"IOPower:/IOPowerConnection/IOPMrootDomain");
-    if (!root) root=IOServiceGetMatchingService(kIOMainPortDefault,IOServiceMatching("IOPMrootDomain"));
-    id value=CFBridgingRelease(IORegistryEntryCreateCFProperty(root,CFSTR("AppleClamshellCausesSleep"),NULL,0));
-    IOObjectRelease(root);
-    return !value || [value boolValue];
+    if (!lidConnection) {
+        lidConnection=[[NSXPCConnection alloc] initWithMachServiceName:GUILLOTINE_LID_SERVICE options:NSXPCConnectionPrivileged];
+        lidConnection.remoteObjectInterface=[NSXPCInterface interfaceWithProtocol:@protocol(GuillotineLidService)];
+        [lidConnection setCodeSigningRequirement:GUILLOTINE_HELPER_REQUIREMENT];
+        [lidConnection resume];
+    }
+    dispatch_semaphore_t done=dispatch_semaphore_create(0);
+    __block BOOL ok=NO;
+    __block NSString *failure=@"Closed-lid helper unavailable. Install and approve it in Settings.";
+    id<GuillotineLidService> proxy=[lidConnection remoteObjectProxyWithErrorHandler:^(NSError *e){ failure=e.localizedDescription; dispatch_semaphore_signal(done); }];
+    void (^reply)(BOOL,NSString *)=^(BOOL success,NSString *message){ ok=success; failure=message; dispatch_semaphore_signal(done); };
+    if (releasing) [proxy releaseWithReply:reply];
+    else [proxy renewWithBatteryAllowed:allowBattery reply:reply];
+    if (dispatch_semaphore_wait(done,dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC))) ok=NO;
+    if (releasing || !ok) { [lidConnection invalidate]; lidConnection=nil; }
+    if (!ok && error) *error=failure;
+    return ok;
 }
 static BOOL restore(void) {
     BOOL ok=YES;
@@ -79,6 +93,7 @@ static BOOL restore(void) {
     }
     // The shared private bit is touched only if this session changed a sleep-causing policy.
     if ([saved[@"lidOwned"] boolValue]) ok=(lidControl(NO)==KERN_SUCCESS) && ok;
+    if ([saved[@"lidService"] boolValue]) ok=lidServiceCall(YES,NULL) && ok;
     if (ok) [[NSFileManager defaultManager] removeItemAtPath:journal error:nil];
     return ok;
 }
@@ -112,10 +127,11 @@ static void enforcePolicy(void) {
 static void powerChanged(void *context) { if (ready) enforcePolicy(); }
 static BOOL applyOff(NSString **error) {
     enforcePolicy();
-    if (closedLid && lidCausesSleep()) {
-        saved[@"lidOwned"]=@YES;
-        if (!saveJournal() || lidControl(YES)!=KERN_SUCCESS) {
-            *error=@"Closed-lid control was rejected. Disable the experimental option or use native clamshell hardware."; return NO;
+    if (closedLid) {
+        saved[@"lidService"]=@YES;
+        if (!saveJournal() || !lidServiceCall(NO,error)) {
+            if (!*error) *error=@"Could not journal closed-lid helper ownership.";
+            return NO;
         }
     }
     NSMutableDictionary *values=saved[@"keyboards"];
@@ -138,7 +154,7 @@ static BOOL loadHardware(NSString **error) {
     if (fake) return YES;
 #if !defined(__arm64__)
     *error=@"Panel power control requires an Apple Silicon MacBook."; return NO;
-#endif
+#else
     void *lib=dlopen("/System/Library/PrivateFrameworks/IOMobileFramebuffer.framework/IOMobileFramebuffer",RTLD_NOW);
     OpenPanel open=lib?(OpenPanel)dlsym(lib,"IOMobileFramebufferOpen"):NULL;
     setPanel=lib?(SetPanelPower)dlsym(lib,"IOMobileFramebufferRequestPowerChange"):NULL;
@@ -161,6 +177,7 @@ static BOOL loadHardware(NSString **error) {
         *error=@"Keyboard backlight API unavailable on this macOS version."; return NO;
     }
     return YES;
+#endif
 }
 int main(int argc, char **argv) { @autoreleasepool {
     signal(SIGPIPE,SIG_IGN);

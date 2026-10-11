@@ -6,7 +6,15 @@ import AppKit
 
 @main struct GuillotineApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    var body: some Scene { Settings { EmptyView() } }
+    var body: some Scene {
+        Settings { EmptyView() }
+            .commands {
+                CommandGroup(replacing: .appSettings) {
+                    Button("Settings…") { delegate.showSettings() }
+                        .keyboardShortcut(",", modifiers: .command)
+                }
+            }
+    }
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -61,6 +69,7 @@ import AppKit
     func menuWillOpen(_ menu: NSMenu) {
         session.refreshPower()
         preferences.refreshLoginStatus()
+        preferences.refreshLidHelper()
         menu.removeAllItems()
         add("Guillotine · Off with the head", to: menu)
         menu.addItem(.separator())
@@ -70,7 +79,7 @@ import AppKit
         menu.addItem(toggle)
         add(session.power.label, to: menu)
         add(DisplayStatus.summary, to: menu)
-        add(preferences.closedLid ? "Closed lid: experimental override requested" : "Closed lid: normal macOS policy", to: menu)
+        add(preferences.closedLid ? (preferences.lidHelperReady ? "Closed lid: helper ready • global sleep block" : "Closed lid: helper approval needed") : "Closed lid: normal macOS policy", to: menu)
         add(preferences.allowBattery ? "Battery allowed • thermal cutout active" : "Battery disabled • unplug restores", to: menu)
         if let error = session.error {
             let item = NSMenuItem()
@@ -97,6 +106,11 @@ import AppKit
     }
     @objc private func toggleMode() {
         if session.enabled { session.disable() } else {
+            if preferences.closedLid && !preferences.lidHelperReady {
+                preferences.refreshLidHelper()
+                session.reportError("Closed-lid operation needs the approved helper. Install Helper in Settings, then approve Guillotine in macOS Login Items. Lid-open controls work with this option off.")
+                showSettings(); return
+            }
             controls.allowBattery = preferences.allowBattery
             controls.closedLid = preferences.closedLid
             controls.restoreOnSleep = preferences.restoreOnSleep
@@ -105,7 +119,7 @@ import AppKit
         }
         if session.error != nil { showSettings() }
     }
-    @objc private func showSettings() {
+    @objc fileprivate func showSettings() {
         if settingsWindow == nil {
             let controller = NSHostingController(rootView: SettingsView(session: session, preferences: preferences, toggle: { [weak self] in self?.toggleMode() }))
             let window = NSWindow(contentViewController: controller)
@@ -116,6 +130,7 @@ import AppKit
             settingsWindow = window
         }
         preferences.refreshLoginStatus()
+        preferences.refreshLidHelper()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }

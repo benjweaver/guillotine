@@ -67,7 +67,7 @@ class GuardTests(unittest.TestCase):
         import plistlib
         child = self.start('--closed-lid'); self.ready(child)
         state = plistlib.loads((self.folder / 'hardware-session.plist').read_bytes())
-        self.assertTrue(state['lidOwned'])
+        self.assertTrue(state['lidService'])
         child.kill(); child.wait(timeout=2)
         recovered = self.start('--recover')
         self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')

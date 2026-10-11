@@ -27,7 +27,7 @@ enum PowerState: String, Equatable {
 @MainActor final class SessionController: ObservableObject {
     @Published private(set) var enabled = false
     @Published private(set) var power: PowerState = .unknown
-    @Published private(set) var message = "Physical controls start restored. Sleep policy is independent."
+    @Published private(set) var message = "Physical controls start restored."
     @Published private(set) var error: String?
     var allowBattery = false { didSet { refreshPower() } }
     var monitoringAvailable = false
@@ -65,7 +65,7 @@ enum PowerState: String, Equatable {
             enabled = true
             power = readPower()
             if !allowBattery && power != .external { disable(reason: "Restored: power disconnected during activation."); return }
-            message = "Built-in panel power and keyboard backlight off requested. Sleep settings unchanged."
+            message = "Built-in panel power and keyboard backlight off requested."
             onChange?()
         } catch {
             fail("Could not cut screen and keyboard power: \(error.localizedDescription)")

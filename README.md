@@ -1,62 +1,62 @@
 # Guillotine
 
-**Off with the head.** A native menu bar switch that cuts the MacBook's physical panel power and keyboard backlight while leaving its logical display connected for remote access.
+**Off with the head.** A native menu bar switch that powers off an Apple Silicon MacBook’s physical panel and keyboard backlight while retaining its logical display for remote access.
 
-Guillotine leaves ordinary idle-sleep settings, display timeouts and Caffeine independent. It can optionally override lid-close sleep and requests system sleep for the mandatory battery thermal cutout. It never dims the screen to zero. Earlier commits implemented ordinary idle-sleep prevention; the current app does not.
+Lid-open controls leave sleep settings and Caffeine independent. **Optional closed-lid support requires an approved privileged helper and temporarily disables system sleep globally, including ordinary and manual sleep.** That broader control replaces the experimental lid-only override, which failed the physical test on this Mac. No brightness-zero substitute is used for the panel.
 
 ## Supported setup
 
-Apple Silicon MacBooks, macOS 13 or later. Verified hardware: MacBookPro18,1 running macOS 27.0.1. The built-in panel uses the private `IOMobileFramebufferRequestPowerChange` API; the keyboard uses private CoreBrightness APIs. These are experimental and can stop working after macOS updates. Activation fails with an error if either control is unavailable. Intel and desktop/external panel control are not implemented; the universal executable reports that limitation.
+macOS 13+, Apple Silicon MacBooks. Hardware checked: MacBookPro18,1, macOS 27.0.1. Panel power uses private IOMobileFramebuffer APIs; keyboard brightness uses private CoreBrightness APIs, with zero readback verified. Both can change after OS updates. Intel, desktop, and external-panel power control are not implemented; the universal executable reports unsupported hardware clearly.
 
-No brightness-to-zero substitute is used for the screen. The keyboard's backlight brightness is set to zero and checked. The panel's logical framebuffer remains active; no display configuration, mirroring, virtual display, network interface, streaming process or authentication setting is changed. No fake monitor is created. Closed-lid use requires either native macOS clamshell hardware or successful validation of the optional experimental lid override.
+Guillotine leaves display layout, virtual displays, network interfaces, streaming processes, and authentication alone. Retaining a logical framebuffer is different from guaranteeing capturable frames after lid closure. Physical lid-close sleep prevention and a progressing remote stream must both be tested on the exact hardware and host version. No dummy display is created.
 
 ## Use
 
-1. Connect external power, or opt into **Allow on battery** in Settings (off by default).
-2. Click the guillotine menu icon → **Cut Screen & Keyboard**, or use Settings. Both physical controls switch off immediately; the icon fills while the guard owns them.
-3. Restore with **Control–Option–Command–Space**, the menu, or Quit. Fn is optional in Settings. The local Vibepollo input source forwards Control/Option/Command but has no Fn mapping, so the default omits Fn for remote use.
-4. Lock does not change the mode. It also stays active through system sleep/wake by default. Optional restore-on-sleep and restore-on-wake settings apply on the next activation. Normal system sleep still suspends streaming; the optional lid override affects lid sleep only.
-5. Unplugging restores unless **Allow on battery** is enabled. Turning that preference off on battery restores immediately. Reconnecting never reactivates. App exit/crash or a stopped heartbeat restores; launch and login always start restored.
-6. Battery sessions have a mandatory thermal cutout at macOS **serious/critical thermal pressure**: restore panel/backlight and the owned lid override, then request system sleep through IOPMSleepSystem. This is an OS thermal-pressure threshold, not a Celsius sensor or a guarantee that another utility cannot inhibit sleep. Activation on a hot battery is rejected; a fresh activation is required after cooling.
-7. **Allow closed-lid operation (experimental)** requests the private root-domain lid-sleep control. It does not change persistent `pmset` settings, idle-sleep settings, or Caffeine. It is not certified until the physical lid/streaming test passes on your Mac.
+1. Connect external power or opt into **Allow on battery** (off by default). Plugged in but not charging counts as external power.
+2. For closed-lid use, enable **Allow closed-lid operation**, choose **Install Helper…**, and approve Guillotine under macOS **Login Items & Extensions → Allow in the Background**. Keep the app in Applications. Administrator approval is required by macOS.
+3. Choose **Cut Screen & Keyboard**. Activation requires working power notifications, a registered restore shortcut, both physical controls, and, when selected, a working privileged lease. Failed activation restores owned changes and reports an error.
+4. Restore with **Control–Option–Command–Space**, the menu, or Quit. Fn is optional locally; the inspected Vibepollo source does not forward it. Lock-screen/Secure Input shortcut delivery is not yet certified. Normal lock and authentication remain in force.
+5. Lock never changes the active mode. Sleep/wake restoration is optional and off by default. With closed-lid support off, sleep follows the user’s policy. With it on, the global sleep block lasts until restoration.
+6. Unplugging restores unless battery use is allowed. Turning battery use off on battery restores immediately. Reconnecting never reactivates. Launch/login starts restored.
+7. Serious/critical macOS thermal pressure on battery restores physical controls and the owned sleep override, then requests system sleep. This uses OS thermal pressure, not a fabricated Celsius sensor. No deliberate heat test is appropriate. Another utility’s pre-existing sleep block can still reject sleep.
 
-The shortcut is registered exclusively so macOS reports registered conflicts. **Lock-screen and Secure Input delivery are not certified**; remote input reaching loginwindow is not proof a user-session Carbon hotkey is delivered. A remote client must forward the selected keys. The UI remains authenticated and no lock-screen bypass is installed. See the manual acceptance tests before relying on lock-screen recovery. A same-user SSH recovery command works independently of keyboard routing and leaves the Mac locked:
+Transitions or keyboard activity may briefly light the hardware before the guard reapplies off on its next one-second tick. Status indicates ownership, not an electrical power measurement.
+
+Same-user recovery without changing lock state:
 
 ```sh
 /Applications/Guillotine.app/Contents/Helpers/GuillotineGuard --restore
 ```
 
-System transitions can briefly wake the panel/backlight before the guard reapplies the request on its next one-second tick. Settings report ownership, not an electrical power measurement.
+## Restoration and privilege
 
-## Restoration and guard
+The signed, nonprivileged `GuillotineGuard` owns panel/backlight changes, uses independent IOKit power notifications, and holds a five-second anonymous-pipe lease from the app. EOF, expiry, and termination restore. A durable user journal supports recovery after a killed guard. The keyboard’s auto-brightness setting is unchanged; restoration preserves a current nonzero value and otherwise restores the latest recorded nonzero brightness.
 
-`Guillotine.app/Contents/Helpers/GuillotineGuard` is a bundled, signed, **nonprivileged** user process. No root service, installer, SIP change or background daemon is required. The app renews a five-second lease over an anonymous pipe. Pipe EOF, lease expiry, or SIGTERM trigger restoration. Independent IOKit power notifications enforce the battery preference; thermal notifications and a one-second backstop enforce the battery thermal cutout. Sleep/wake notifications grant a bounded eight-second grace for the parent to renew; the lease is never made indefinite. The default never restores merely because the screen locks.
+The optional root `GuillotineLidHelper` accepts only the signed guard from the current console user. Its XPC interface can renew or release one lease; callers cannot supply commands, paths, or power-setting names. It journals the original `SleepDisabled` value and whether it was absent before invoking fixed `pmset -a disablesleep 1`. A separate five-second lease, connection invalidation, power notifications, and a thermal backstop restore the setting. Launchd restarts a crashed helper to recover its root-owned journal before accepting another session. No SIP change or private Apple entitlement is required.
 
-Before a hardware write, the guard atomically writes and fsyncs `~/Library/Application Support/Guillotine/hardware-session.plist`. An exclusive file lock prevents two guards owning the same hardware. An app restart recovers a killed guard's journal before activation. A killed guard itself cannot execute cleanup: app recovery or the next launch retries restoration. If APIs become unavailable, restart macOS and report the error.
+Restoration touches only the app-owned key if it still equals the value written. Other power settings remain intact. A pre-existing sleep block is left unchanged. Concurrent writes of the identical value cannot be attributed perfectly; avoid competing tools that change `disablesleep`. Keep recovery journals until restoration succeeds. See [platform details](docs/PLATFORM.md).
 
-The guard never changes keyboard auto-brightness. While active it keeps the backlight at zero; if the user/OS raises it, it records that new value before reapplying zero. Restoration leaves a nonzero current value alone, otherwise restores the most recently recorded value. Panel restoration sends power-on only for the session's owned power-off request; no public per-client ownership token exists for this private API. Normal macOS power behavior resumes when the guard ends.
+To remove: Restore, choose **Remove Helper**, disable launch at login, quit, and delete the app. Do not delete an app with pending root recovery before its helper has restored the setting. The helper is embedded in the app; macOS ServiceManagement manages registration/removal.
 
-Remove by restoring, disabling launch at login, quitting and deleting the app. There is no privileged helper to uninstall. Keep a pending recovery journal until restoration has succeeded.
+## Build and verify
 
-## Build, signing and tests
-
-Open `Guillotine.xcodeproj` and run the **Guillotine** scheme on My Mac. The complete shared project is included; XcodeGen is optional. Xcode 16+ is recommended; verified with Xcode 27 beta.
+The complete shared Xcode project is included. `project.yml` is the source for optional XcodeGen regeneration. Verified with release Xcode 27. Compiler warnings are errors. Tests target macOS 14 because Xcode 27’s XCTest requires it; the app targets 13.
 
 ```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
   -configuration Release -derivedDataPath build \
   CODE_SIGN_IDENTITY=- ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
-open build/Build/Products/Release/Guillotine.app
 ```
 
-The supplied app and guard are Developer ID signed with hardened runtime and secure timestamps, but not notarized. For distribution, sign/notarize using your own Apple credentials. Do not weaken Gatekeeper or SIP.
+Ad hoc builds can exercise lid-open controls and fake tests. **Real privileged XPC requires matching trusted signatures**: change the two requirements in `Sources/Shared/LidService.h` to your signing identity and sign the app and both helpers consistently. This local build uses Ben Weaver’s Developer ID (AR25V66TVY), hardened runtime, and secure timestamps. It is a private test build, not a notarized release.
 
 ```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
   -destination 'platform=macOS' -derivedDataPath build CODE_SIGN_IDENTITY=- test
 python3 scripts/test-guard.py build/Build/Products/Debug/GuillotineGuard
+python3 scripts/test-lid-helper.py build/Build/Products/Debug/GuillotineLidHelper
 ```
 
-The guard test flag uses fake hardware only. It is not a system-power override. Test results and remaining physical/remote checks are in [docs/TESTING.md](docs/TESTING.md). API references are in [docs/PLATFORM.md](docs/PLATFORM.md). `./scripts/make-icon.sh` regenerates app artwork from the same vector drawing as the menu and Settings icons.
-
-GPL-3.0-only, including original artwork; see LICENSE. The repository remains private during development.
+Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-only; see LICENSE. Repository remains private during development.

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0401B89310EB49DE7ADD23A4 /* GuillotineApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1F2C7A714AF40C99BA7AFD /* GuillotineApp.swift */; };
+		0AAD1529CC6537E53FF1B8B5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D0FBFEB53FF6EDC3666821AE /* main.m */; };
 		0CCB0257E2CC6DD921DE1FB3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 886F38EF08BBD5CF4562CE57 /* LICENSE */; };
 		0F8B53AAA0DAB71095F7F3E0 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
 		3FC440EC5C337487FF145BAB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */; };
@@ -19,11 +20,14 @@
 		98251AB63F811D10CFD91ED2 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
 		A13641DF5883CFDCE5E307A2 /* ServiceManagement.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E0C3C432C065AE98283A637F /* ServiceManagement.framework */; };
 		A6FE6C2900D1064AF01A1B0B /* SessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA03E68B083F6F263E07E436 /* SessionTests.swift */; };
+		A9C7311BC1F85A2B8F0F4384 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
 		CD6B8305D13AFABFD668614D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BBE538B19CF588F7C1A22C4C /* Assets.xcassets */; };
 		DB08246469F3ADC62AE731AE /* HeadlessGuide.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */; };
 		DCAF6A50DF6B5B80DD8F42EA /* GlobalShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045372880B00E4B6E6F04823 /* GlobalShortcut.swift */; };
 		DF7C07698C2208877AF1820B /* SessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC412360E895079ADA11026 /* SessionController.swift */; };
+		E8D55C41D3173AC0721C354B /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EA41138E5959B15C70B8383 /* SystemConfiguration.framework */; };
 		F48B5B620BE44DCF0D41C2B3 /* PowerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB403A034BE910093CE4540 /* PowerMonitor.swift */; };
+		F53A01EA5D5C85F7B54D590B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 579F761C84A014C1C14C3D3B /* Foundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,13 +45,23 @@
 			remoteGlobalIDString = 4E0B31065A5F89F68BBB4FF7;
 			remoteInfo = Guillotine;
 		};
+		E6BD9FA19595AD32B56909A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7D422C11EF44E0CC44078140 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6256942B1CEC891D99438680;
+			remoteInfo = GuillotineLidHelper;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		045372880B00E4B6E6F04823 /* GlobalShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalShortcut.swift; sourceTree = "<group>"; };
 		0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = HeadlessGuide.txt; sourceTree = "<group>"; };
+		0EA41138E5959B15C70B8383 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		1AB403A034BE910093CE4540 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
+		391C5AE463B6BB3A7C3C8CE5 /* GuillotineLidHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = GuillotineLidHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		488980E09E9EBAE78ED11836 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		579F761C84A014C1C14C3D3B /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		6E381EB032717F36B4EFF02C /* Guillotine.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Guillotine.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7299F62E31542C804255DF5A /* GuillotineGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuillotineGlyph.swift; sourceTree = "<group>"; };
 		807B71214F22929565799208 /* GuillotineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuillotineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -59,6 +73,7 @@
 		BBE538B19CF588F7C1A22C4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BD93A26B7502A992AC7BA832 /* GuillotineGuard */ = {isa = PBXFileReference; includeInIndex = 0; path = GuillotineGuard; sourceTree = BUILT_PRODUCTS_DIR; };
 		C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D0FBFEB53FF6EDC3666821AE /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		E0C3C432C065AE98283A637F /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		EA03E68B083F6F263E07E436 /* SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTests.swift; sourceTree = "<group>"; };
 		FAC412360E895079ADA11026 /* SessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionController.swift; sourceTree = "<group>"; };
@@ -72,6 +87,16 @@
 			files = (
 				958073D6E826252BCB42B404 /* AppKit.framework in Frameworks */,
 				98251AB63F811D10CFD91ED2 /* IOKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAB6C7E0F82551FA39C2CCC4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F53A01EA5D5C85F7B54D590B /* Foundation.framework in Frameworks */,
+				A9C7311BC1F85A2B8F0F4384 /* IOKit.framework in Frameworks */,
+				E8D55C41D3173AC0721C354B /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,6 +120,15 @@
 				0C456EFD69564E0D40BAD6FC /* HeadlessGuide.txt */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		1E4CD20FA5215AF6FD17E38F /* GuillotineLidHelper */ = {
+			isa = PBXGroup;
+			children = (
+				D0FBFEB53FF6EDC3666821AE /* main.m */,
+			);
+			name = GuillotineLidHelper;
+			path = Sources/GuillotineLidHelper;
 			sourceTree = "<group>";
 		};
 		225345C0C5AF08C4DCDF40F0 /* Guillotine */ = {
@@ -127,6 +161,7 @@
 				886F38EF08BBD5CF4562CE57 /* LICENSE */,
 				225345C0C5AF08C4DCDF40F0 /* Guillotine */,
 				DA392D0DC7E563CBB7DEBBB2 /* GuillotineGuard */,
+				1E4CD20FA5215AF6FD17E38F /* GuillotineLidHelper */,
 				2A582ABAAA6B41E0EE5FDD6D /* GuillotineTests */,
 				15AF2AD430717B2665EB74ED /* Resources */,
 				BB4AC73FAAD919F3E59DCC42 /* Frameworks */,
@@ -139,8 +174,10 @@
 			children = (
 				8095FC8E4B7EA1ECF5785866 /* AppKit.framework */,
 				BB71D6736DFB938115FE4BBF /* Carbon.framework */,
+				579F761C84A014C1C14C3D3B /* Foundation.framework */,
 				488980E09E9EBAE78ED11836 /* IOKit.framework */,
 				E0C3C432C065AE98283A637F /* ServiceManagement.framework */,
+				0EA41138E5959B15C70B8383 /* SystemConfiguration.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -150,6 +187,7 @@
 			children = (
 				6E381EB032717F36B4EFF02C /* Guillotine.app */,
 				BD93A26B7502A992AC7BA832 /* GuillotineGuard */,
+				391C5AE463B6BB3A7C3C8CE5 /* GuillotineLidHelper */,
 				807B71214F22929565799208 /* GuillotineTests.xctest */,
 			);
 			name = Products;
@@ -180,6 +218,7 @@
 			);
 			dependencies = (
 				0C6562A7FD808049726254FF /* PBXTargetDependency */,
+				EE4396D8CF811967A1793782 /* PBXTargetDependency */,
 			);
 			name = Guillotine;
 			packageProductDependencies = (
@@ -187,6 +226,24 @@
 			productName = Guillotine;
 			productReference = 6E381EB032717F36B4EFF02C /* Guillotine.app */;
 			productType = "com.apple.product-type.application";
+		};
+		6256942B1CEC891D99438680 /* GuillotineLidHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7C4EA59C92F30515C1BC7A17 /* Build configuration list for PBXNativeTarget "GuillotineLidHelper" */;
+			buildPhases = (
+				C2C5B479E754EF081D4C4911 /* Sources */,
+				AAB6C7E0F82551FA39C2CCC4 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GuillotineLidHelper;
+			packageProductDependencies = (
+			);
+			productName = GuillotineLidHelper;
+			productReference = 391C5AE463B6BB3A7C3C8CE5 /* GuillotineLidHelper */;
+			productType = "com.apple.product-type.tool";
 		};
 		EF1830345E9CFEEDC1638581 /* GuillotineGuard */ = {
 			isa = PBXNativeTarget;
@@ -236,6 +293,9 @@
 					4E0B31065A5F89F68BBB4FF7 = {
 						ProvisioningStyle = Automatic;
 					};
+					6256942B1CEC891D99438680 = {
+						ProvisioningStyle = Automatic;
+					};
 					EF1830345E9CFEEDC1638581 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -260,6 +320,7 @@
 			targets = (
 				4E0B31065A5F89F68BBB4FF7 /* Guillotine */,
 				EF1830345E9CFEEDC1638581 /* GuillotineGuard */,
+				6256942B1CEC891D99438680 /* GuillotineLidHelper */,
 				F7571FDEFAB386C5AF497E4D /* GuillotineTests */,
 			);
 		};
@@ -288,16 +349,20 @@
 			);
 			inputPaths = (
 				"$(BUILT_PRODUCTS_DIR)/GuillotineGuard",
+				"$(BUILT_PRODUCTS_DIR)/GuillotineLidHelper",
+				"$(SRCROOT)/Resources/LaunchDaemons/dev.guillotine.LidHelper.plist",
 			);
 			name = "Embed hardware guard";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/GuillotineGuard",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/GuillotineLidHelper",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Library/LaunchDaemons/dev.guillotine.LidHelper.plist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers\"\ncp \"$BUILT_PRODUCTS_DIR/GuillotineGuard\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/GuillotineGuard\"\n";
+			shellScript = "mkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers\"\ncp \"$BUILT_PRODUCTS_DIR/GuillotineGuard\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/GuillotineGuard\"\ncp \"$BUILT_PRODUCTS_DIR/GuillotineLidHelper\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/GuillotineLidHelper\"\nmkdir -p \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchDaemons\"\ncp \"$SRCROOT/Resources/LaunchDaemons/dev.guillotine.LidHelper.plist\" \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Library/LaunchDaemons/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -332,6 +397,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C2C5B479E754EF081D4C4911 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0AAD1529CC6537E53FF1B8B5 /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -344,6 +417,11 @@
 			isa = PBXTargetDependency;
 			target = 4E0B31065A5F89F68BBB4FF7 /* Guillotine */;
 			targetProxy = 63B9D9FE6ECEF4C8C55BA1FC /* PBXContainerItemProxy */;
+		};
+		EE4396D8CF811967A1793782 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6256942B1CEC891D99438680 /* GuillotineLidHelper */;
+			targetProxy = E6BD9FA19595AD32B56909A5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -398,7 +476,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -412,12 +490,14 @@
 					"$(inherited)",
 					"DEBUG=1",
 				);
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LM_SKIP_METADATA_EXTRACTION = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -427,9 +507,25 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
+		};
+		13403224E9AD0DF2138E17EC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.guillotine.GuillotineLidHelper;
+				SDKROOT = macosx;
+			};
+			name = Release;
 		};
 		3C7FA175BBF4205565207983 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -442,6 +538,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.guillotine.GuillotineTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Guillotine.app/Contents/MacOS/Guillotine";
@@ -498,7 +595,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -506,12 +603,14 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				LM_SKIP_METADATA_EXTRACTION = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -520,9 +619,25 @@
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
+		};
+		5F82585EF2302D6F89637C69 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				COMBINE_HIDPI_IMAGES = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.guillotine.GuillotineLidHelper;
+				SDKROOT = macosx;
+			};
+			name = Debug;
 		};
 		A060CF051857FFDC57E044F8 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -535,6 +650,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.guillotine.GuillotineTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Guillotine.app/Contents/MacOS/Guillotine";
@@ -588,6 +704,15 @@
 			buildConfigurations = (
 				0EC0C1C54EAD2343D5689375 /* Debug */,
 				4D768AF183F3A53ED97180EB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7C4EA59C92F30515C1BC7A17 /* Build configuration list for PBXNativeTarget "GuillotineLidHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F82585EF2302D6F89637C69 /* Debug */,
+				13403224E9AD0DF2138E17EC /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

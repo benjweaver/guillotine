@@ -1,38 +1,46 @@
 GUILLOTINE — OFF WITH THE HEAD
 
-Cut Screen & Keyboard switches off the built-in Apple Silicon panel and
-keyboard backlight while leaving the logical display connected.
+Cut Screen & Keyboard powers off the built-in Apple Silicon panel and
+keyboard backlight while retaining the logical display. It never substitutes
+screen brightness zero. Keyboard zero readback is verified; auto-brightness
+is unchanged. Private APIs require revalidation after macOS updates.
 
-Ordinary idle sleep stays independent. Caffeine and streaming hosts retain
-their own policy. Optional closed-lid control affects lid sleep; the mandatory
-battery thermal cutout restores controls and requests system sleep.
+Restore: Control–Option–Command–Space. Fn is optional locally; Vibepollo’s
+inspected input source does not forward it. Lock leaves the mode unchanged.
+Lock-screen/Secure Input hotkey delivery still needs testing. Authentication
+and lock policy remain normal. Sleep/wake restoration is optional.
 
-Restore: Control–Option–Command–Space. Fn is optional in Settings; the local
-Vibepollo input source does not currently forward Fn. Lock-screen and Secure
-Input hotkey delivery must be tested; there is no authentication bypass.
-Lock leaves the mode unchanged. Stay headless across sleep and wake is the
-default; optional restore-on-sleep and restore-on-wake are in Settings.
+CLOSED LID: enable the option, Install Helper, then approve
+Guillotine in macOS Login Items & Extensions, Allow in the Background.
+Keep the app in Applications. Administrator approval is required.
 
-The APIs are PRIVATE and experimental. The panel uses a power request, never
-screen brightness zero. Keyboard brightness zero is checked, and its original
-value is journaled for restoration. Keyboard auto-brightness is not changed.
-No virtual display is created or altered. Real capture compatibility still
-requires a progressing-frame/input test on the exact streaming stack.
+The root helper leases the global SleepDisabled control. THIS ALSO BLOCKS
+ORDINARY AND MANUAL SLEEP while active. With this option off, sleep and
+Caffeine settings remain independent. The previous experimental lid-only
+control failed the physical test on this Mac and is no longer used to enable.
+The new control still requires a physical closed-lid test before relying on it.
 
-Battery use is optional and off by default. Unplugging restores unless Allow on
-battery is enabled. Turning it off on battery restores immediately. Replugging
+Battery use is optional, off by default. Unplugging restores unless Allow on
+battery is enabled; turning it off on battery restores immediately. Replugging
 never activates. Serious/critical macOS thermal pressure on battery restores
-controls and requests system sleep; no Celsius sensor is claimed.
-App quit/crash or a five-second lease expiry restores
-physical controls through a bundled nonprivileged guard. If the guard itself
-is killed, reopen Guillotine to recover its journal. If recovery fails,
-restart macOS. There is no root service or SIP change.
+owned controls and requests system sleep. No Celsius sensor is claimed.
+Other utilities’ pre-existing sleep blocks are left untouched.
 
-Optional closed-lid control uses a shared private kernel bit, not an idle-sleep
-assertion. It is experimental and needs a physical lid/capture test on this Mac.
-It does not change persistent pmset settings; no privileged fallback is installed.
-Concurrent lid utilities cannot be perfectly distinguished. A virtual display or
-adapter may still be needed for streaming after lid closure.
+Separate five-second leases protect the physical guard and privileged helper.
+The helper journals the original sleep setting before changing it, restores
+only its owned value, and recovers after a crash through launchd. Identical
+concurrent writes cannot be attributed; avoid competing disablesleep tools.
+No SIP change or private Apple entitlement is used. If the physical guard is
+killed, reopen Guillotine to recover its journal. Keep pending journals until
+restoration succeeds. If hardware recovery fails, restart macOS.
 
-Supported: Apple Silicon MacBook, macOS 13+. Intel/desktop/external panel power
-control is unavailable. Launch always starts restored. Login remains normal.
+No virtual display, network interface, remote input, or streaming process is
+changed. Preventing computer sleep and keeping capturable frames are separate.
+Verify progressing frames and input after lid closure on your exact stack;
+a virtual display/adapter may still be needed.
+
+To remove: Restore, Remove Helper, disable launch at login, quit, then delete
+the app. Do not remove a helper with pending sleep-setting recovery.
+
+Supported: Apple Silicon MacBooks, macOS 13+. Intel, desktop, and external
+panel power control are unavailable. Login and launch always start restored.

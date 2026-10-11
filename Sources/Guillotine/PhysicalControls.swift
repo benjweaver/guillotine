@@ -43,7 +43,7 @@ import Darwin
         input.fileHandleForReading.closeFile()
         output.fileHandleForWriting.closeFile()
         var descriptor = pollfd(fd: output.fileHandleForReading.fileDescriptor, events: Int16(POLLIN), revents: 0)
-        let available = poll(&descriptor, 1, 3000)
+        let available = poll(&descriptor, 1, 10000)
         let response = available > 0 ? String(data: output.fileHandleForReading.availableData, encoding: .utf8) ?? "" : ""
         guard response.hasPrefix("READY") else {
             input.fileHandleForWriting.closeFile()

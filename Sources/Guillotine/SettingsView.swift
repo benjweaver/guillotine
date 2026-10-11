@@ -16,6 +16,31 @@ import ServiceManagement
     @Published var restoreOnWake = UserDefaults.standard.bool(forKey: "restoreOnWake") {
         didSet { UserDefaults.standard.set(restoreOnWake, forKey: "restoreOnWake") }
     }
+    private let lidService = SMAppService.daemon(plistName: "dev.guillotine.LidHelper.plist")
+    @Published private(set) var lidHelperStatus = "Not installed"
+    @Published private(set) var lidHelperState = SMAppService.Status.notRegistered
+    @Published var lidHelperError: String?
+    var lidHelperReady: Bool { lidService.status == .enabled }
+    func refreshLidHelper() {
+        lidHelperState = lidService.status
+        switch lidHelperState {
+        case .enabled: lidHelperStatus = "Approved"; lidHelperError = nil
+        case .requiresApproval: lidHelperStatus = "Administrator approval required in Login Items"
+        case .notRegistered: lidHelperStatus = "Not installed"
+        default: lidHelperStatus = "Unavailable—keep Guillotine in Applications"
+        }
+    }
+    func installLidHelper() {
+        do { try lidService.register(); lidHelperError = nil }
+        catch { lidHelperError = error.localizedDescription }
+        refreshLidHelper()
+        if lidHelperState == .requiresApproval { lidHelperError = nil }
+    }
+    func removeLidHelper() {
+        do { try lidService.unregister(); lidHelperError = nil }
+        catch { lidHelperError = error.localizedDescription }
+        refreshLidHelper()
+    }
     var batteryPolicyChanged: ((Bool) -> Void)?
     @Published var allowBattery = UserDefaults.standard.bool(forKey: "allowBattery") {
         didSet { UserDefaults.standard.set(allowBattery, forKey: "allowBattery"); batteryPolicyChanged?(allowBattery) }
@@ -106,12 +131,24 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Allow on battery", isOn: $preferences.allowBattery)
                 Text("Off by default. When off, unplugging restores immediately. Battery sessions restore and request sleep at serious or critical macOS thermal pressure.").font(.caption).foregroundStyle(.secondary)
-                Toggle("Allow closed-lid operation (experimental)", isOn: $preferences.closedLid)
-                Text("Uses the private lid-sleep control, without changing pmset settings. Requires physical testing on this Mac; remote capture may still need a virtual display or adapter. Applies next activation.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Allow closed-lid operation (requires helper)", isOn: $preferences.closedLid)
+                Text("Temporarily sets global SleepDisabled while active. This also blocks ordinary/manual sleep until restored. Original value is journaled by a privileged, leased helper. Capture may still need a virtual display/adapter; physical testing remains required.").font(.caption).foregroundStyle(.secondary)
+                Text("Closed-lid helper: \(preferences.lidHelperStatus)").font(.caption)
+                HStack {
+                    switch preferences.lidHelperState {
+                    case .enabled:
+                        Button("Remove Helper") { session.disable(); if !session.enabled { preferences.removeLidHelper() } }
+                    case .requiresApproval:
+                        Button("Open Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+                    default:
+                        Button("Install Helper…") { preferences.installLidHelper() }
+                    }
+                }
+                if let error = preferences.lidHelperError { Text(error).font(.caption).foregroundStyle(.red) }
                 Text("Stay headless across lock, sleep and wake by default.").font(.caption)
                 Toggle("Restore physical controls when sleeping", isOn: $preferences.restoreOnSleep)
                 Toggle("Restore physical controls when waking", isOn: $preferences.restoreOnWake)
-                Text("Changes apply next time you cut the lights. Sleep and Caffeine settings stay independent.").font(.caption).foregroundStyle(.secondary)
+                Text("Changes apply next activation. With closed-lid support off, sleep and Caffeine settings stay independent.").font(.caption).foregroundStyle(.secondary)
             }
             Toggle("Launch Guillotine at login (always starts disabled)", isOn: Binding(get: { preferences.loginEnabled || preferences.loginNeedsApproval }, set: preferences.setLogin))
             if preferences.loginNeedsApproval {
@@ -123,7 +160,8 @@ struct SettingsView: View {
         }
         .padding(24)
         }.frame(width: 500, height: 660)
-        .onAppear { key = preferences.shortcut.key; modifiers = preferences.shortcut.modifiers; session.refreshPower() }
-        .onChange(of: scenePhase) { _ in preferences.refreshLoginStatus() }
+        .onAppear { key = preferences.shortcut.key; modifiers = preferences.shortcut.modifiers; session.refreshPower(); preferences.refreshLidHelper() }
+        .onChange(of: scenePhase) { _ in preferences.refreshLoginStatus(); preferences.refreshLidHelper() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in preferences.refreshLoginStatus(); preferences.refreshLidHelper() }
     }
 }

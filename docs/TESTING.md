@@ -1,35 +1,41 @@
-# Revised hardware-control verification — 2026-10-10
+# Verification — 2026-10-10
 
-Host: MacBookPro18,1 (Apple Silicon), macOS 27.0.1 (26A434), Xcode 27 beta. Minimum macOS and Intel runtime checks are outstanding; Intel panel control intentionally reports unsupported.
+Host: MacBookPro18,1, macOS 27.0.1. Build 6 uses release Xcode 27, macOS 13 app deployment, and compiler warnings as errors. XCTest targets 14 to match the installed XCTest libraries. Intel hardware and minimum-OS runtime testing remain outstanding.
 
 ## Actually run
 
-- 17 XCTest tests passed after replacing the sleep assertion with an injected physical-control interface. Covers start restored, activation on battery/UPS/unknown power, power transitions preserving the active mode, informational power refresh, repeated ownership cycles, release failure/retry, shortcut validation/exclusivity/replacement and Carbon callback-to-restore.
-- 13 fake-hardware guard integration tests passed, covering battery opt-in, unplug restoration, live battery-policy revocation, thermal restore-before-sleep ordering, no thermal sleep on AC, owned lid cleanup/recovery, plus: anonymous-pipe disconnect, five-second lease expiry, heartbeat renewal, SIGTERM cleanup, SIGKILL journal recovery on next launch, duplicate-guard exclusion and the remote restore command. No physical power controls were invoked by these tests.
-- Read-only hardware probe found the built-in `disp0,t600x` framebuffer, keyboard ID and API symbols/selectors.
-- A timed one-second panel-off pulse with a separate three-second power-on fallback returned success. **The user confirmed the physical screen turned off and came back.** CoreGraphics continued reporting one active logical display.
-- Keyboard pulse: original 0.001, zero write succeeded, zero readback verified, original value restored. Auto-brightness remained enabled.
-- Real guard end-to-end: READY, keyboard zero readback, then closing its lease yielded exit 0 and removed the recovery journal. Keyboard original 0.001 and unchanged auto-brightness were verified after release. Caffeine continued holding its own display assertion. Neither Guillotine nor its guard held any sleep assertion.
-- Universal Release app and guard built and Developer ID signatures verified. Installed build 5 starts OFF, shows battery power, the non-Fn default shortcut, optional Fn and sleep/wake restore settings. Existing launch-at-login choice was preserved. Prior build 4 battery activation was exercised through the installed app: Settings changed to ON on battery, then the independent restore command returned it to OFF with “Physical controls restored by hardware guard.” This verifies application/guard integration; physical darkness was not separately confirmed by the user in this cycle.
-- Earlier sleep-prevention tests and UTM results are archived in [HISTORICAL-TESTS.md](HISTORICAL-TESTS.md); they do not certify the revised physical-control implementation. A VM has no physical MacBook panel/backlight and cannot certify them.
+- 17 XCTest cases pass: disabled launch, battery opt-in, power loss/reconnect, live policy revocation, rechecks around activation, repeated toggles, failure/retry, and shortcut registration/callback behavior.
+- 13 fake hardware-guard integration cases pass: disconnect, expiry/renewal, signals, SIGKILL recovery, duplicate exclusion, explicit restore, battery policy, thermal ordering, and no thermal sleep on AC.
+- 9 fake privileged-helper cases cover original/absent settings, disconnection, expiry with blocked renewal, external changes, unplugging, battery thermal cleanup, SIGTERM, SIGKILL/startup recovery, and interrupted absence restoration. These use files instead of system settings and do not run as root.
+- Universal signed build 6 compiles cleanly with release Xcode 27. Both executable architectures and nested signatures are checked before installation. App Intents extraction is omitted because this app defines none; no warning suppression is added to compiler flags.
+- Earlier real panel pulse: user confirmed the screen physically turned off and back on, while CoreGraphics retained one active logical display. Registry CurrentPowerState did not change and is not treated as proof.
+- Earlier real keyboard/guard test: zero readback, then restored original 0.001; auto-brightness remained enabled. Caffeine kept its own display assertion; the app and guard held no sleep assertion.
+- **Build 5 failed closed-lid testing.** User confirmed ON and battery allowed. Power log: 20:23:57 Clamshell Sleep on battery 98%, lid-open wake at 20:24:01. Build 6 replaces that path with a root sleep-disable lease. API success in build 5 was insufficient evidence.
+- Build 6 installed and helper approved. Real activation set both `pmset SleepDisabled=1` and the kernel `SleepDisabled=Yes`; restoration returned the originally absent system setting. A separate unsigned XPC client was rejected without changing the setting.
+- **Build 6 passed the user’s closed-lid awake test on this Mac.** During the test the registry showed lid closed and SleepDisabled active; the power log showed no new sleep/wake event (last sleep remained the failed build-5 event at 20:23:57). User confirmed it stayed awake on battery and could reconnect through Vibepollo while the lid remained shut. The stream disconnected at closure; uninterrupted capture did not pass. User observed the Vibepollo display behaving as a second monitor while the physical panel stayed off.
+- Actual root-helper SIGKILL recovery and independent expiry under a paused guard remain unverified on hardware; fake lifecycle tests cover them. No physical thermal stress was attempted.
 
-## Manual acceptance still needed
+Prior UTM tests concern the earlier sleep-assertion implementation; see [historical results](HISTORICAL-TESTS.md). A VM cannot certify a MacBook lid, panel, or backlight.
+
+## Manual acceptance checklist
 
 | Test | Expected result |
 | --- | --- |
-| Cut/restore on AC and battery | Actual physical panel and keyboard backlight go off immediately; menu/Settings owns the session; restore shortcut brings both back. Repeat 20 times. |
-| Independent Caffeine | Leave Caffeine active, cut the lights, verify physical darkness and continuing remote frames. Caffeine state/assertions must remain unchanged. |
-| Keyboard activity/ambient light | With mode active, type locally/remotely and vary lighting. Guard reapplies zero within one second, leaving auto-brightness preference unchanged. Restore latest user/OS value when disabled. |
-| Lock screen | Establish Vibepollo/Moonlight, cut the lights, lock normally. Physical controls and active status remain off/active. Verify progressing remote lock-screen frames and authentication. Try Control–Option–Command–Space both locally and remotely. **Delivery is not yet certified**; do not assume Fn is forwarded. |
-| Sleep/wake default | Sleep normally while headless, wake through ordinary means. Active mode persists; remote sessions resume per their own behavior. Panel/backlight may briefly wake before the guard reapplies off. Neither app nor guard prevents system sleep. |
-| Optional restore behavior | Enable each restore preference separately, start a new session, then sleep/wake. Guard restores and app becomes inactive only for the selected transition. Lock remains independent. |
-| Power loss | Unplug while active, including locked/closed lid. With battery use off, restore on unplug and remain off on replug. With battery use on, stay active across unplug/replug; switching it off restores immediately. Normal macOS sleep behavior applies. |
-| Battery thermal cutout | Fake serious/critical thermal pressure tests cover restore-before-sleep ordering; do not heat the Mac intentionally. Real OS thermal sleep, other sleep blockers, and reopening after a thermal cutout remain hardware acceptance tests. |
-| App crash/hang | With guard active, SIGKILL only the exact app PID: pipe EOF restores. Suspend the app: lease expiry restores within approximately five awake seconds. No sleep settings change. |
-| Guard crash | Kill only the exact guard PID. App detects exit and recovers the journal. Also kill both, then relaunch: recovery should restore. Never remove a pending journal first. |
-| User keyboard changes | Change backlight brightness during a session. Guard journals that new nonzero value before reapplying zero. On restore, preserve a current nonzero user value. |
-| Lid close | Enable the experimental option, start a fresh session on AC, close for 20 seconds while monitoring a progressing remote clock/video and input, then reopen/restore. Repeat on battery only after opting in. API success is not a passing lid test. If it sleeps or loses frames, document the exact hardware/display setup; a virtual display/adapter or privileged alternative may be required. |
-| Streaming | Exact Vibepollo and Sunshine/Moonlight builds, Screen Sharing: changing clock/video, input, lock/unlock, display-off, sleep/wake, reconnect and restoration. Check progressing frames, not a stale connected image. |
-| Quit/reboot/login | Quit restores; login/reboot starts restored even when launch at login is enabled. Existing stream/network processes are untouched. |
+| Helper approval | Approve the signed service in Login Items. Settings reports Approved. An unsigned or wrong-team XPC client cannot acquire a lease. |
+| Actual sleep setting | Record `pmset -g custom` and `pmset -g`. Activate with closed-lid support: SleepDisabled becomes 1. Restore: prior value/absence returns; other keys unchanged. Repeat and inspect root recovery journal cleanup. |
+| Lid close on AC | Enable closed-lid support, activate, monitor changing clock/video remotely, close 20 seconds, reopen. No Clamshell Sleep event; frames/input continue on the exact display/capture setup. |
+| Lid close on battery | Opt into battery operation, repeat. No Clamshell Sleep event while the lease is active. Keep normal thermal protections in force. |
+| Unplug closed lid | Battery use off: restore physical controls and owned sleep setting; normal clamshell policy may then sleep. Replug must not activate. Battery use on: continue without sleep; live opt-out restores. |
+| Panel/keyboard | Both physically dark immediately. Type and vary ambient light; zero reapplies within one second. Restore latest recorded brightness without changing auto-brightness. Repeat toggles. |
+| Caffeine | With closed-lid option off, user sleep policy and Caffeine remain independent. With it on, global sleep is blocked; Caffeine’s own state remains unchanged. |
+| Lock/hotkey | Lock normally while headless; mode stays active. Test local and remote Control–Option–Command–Space at loginwindow. Authenticate normally. Hotkey delivery is not yet certified. |
+| Sleep/wake options | With closed-lid option off, test default persistence and each optional restore setting in fresh sessions. With it on, expect ordinary/manual sleep to be blocked. |
+| Quit/app crash/hang | Restore on quit/EOF or five-second parent lease expiry. Physical controls and owned global sleep setting return. No forced sleep or remote-process termination. |
+| Guard crash | Kill exact guard PID: app recovers physical journal; root lease independently releases. Kill app and guard, then reopen to recover physical controls. |
+| Root helper crash | While active, kill exact helper PID: launchd restart restores journal before accepting another session. The guard fails closed; activation is not silently retried. |
+| User power changes | Change SleepDisabled to 0 during a session: preserve that change and end session. Identical-value writes are not distinguishable. Keep other pmset keys unchanged. |
+| Thermal safety | Fake tests verify ordering. Do not deliberately heat hardware. Real OS serious/critical battery pressure should restore controls/owned sleep block, request sleep, and require manual reactivation. Another utility’s sleep block may prevent the transition. |
+| Remote streams | Exact Vibepollo, Sunshine/Moonlight, Screen Sharing versions: progressing frames/input, lock/unlock, lid closure, reconnect, and restoration. A connected stale frame is not a pass. |
+| Remove/reboot | Restore, Remove Helper, disable login, quit/delete. No owned override remains. Reboot/login starts disabled; startup helper recovery precedes new leases. |
 
-No end-to-end remote capture, lock-screen shortcut, real sleep/wake or physical power-transition result is implied by the automated tests. Private APIs require revalidation after macOS updates.
+Keep results separate: fake tests, actual settings, physical darkness, no-sleep power logs, and remote frame progression establish different properties. Private APIs need revalidation after updates.

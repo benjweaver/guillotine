@@ -131,4 +131,9 @@ unsuitable as a physical measurement. The guard now uses the proven AppKit event
 pump for real sessions; recovery remains short-lived, and fake tests stay out of
 the GUI session. The universal Developer ID build, nested signatures, and seven
 display-event regression cases passed; build 17 was installed locally with
-controls restored. Hardware retest pending.
+controls restored. **Physical retest passed:** the user confirmed the panel goes
+dark after disconnect with the lid open, reconnect succeeds, and Restore lights
+the panel. The guard logged event-driven off requests at 02:48:30, 02:48:33,
+and 02:48:36 during disconnect/reconnect, at least three seconds apart. No
+recurring panel requests followed the settled transitions. Closed-lid operation
+remains experimental and is not certified by this test.

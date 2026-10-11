@@ -15,8 +15,9 @@ our own panel request. No recurring panel-write timer or automatic retry exists.
 Event reapplication checks the lid immediately before writing; closed or unknown
 lid state suppresses it. System sleep cancels pending work, and restore-on-wake
 takes precedence. Lease expiry, restore requests, and battery/thermal policy also
-take precedence over a pending write. Physical acceptance after a Vibepollo
-disconnect remains required; fake events establish scheduling, not panel darkness.
+take precedence over a pending write. The build-17 physical test passed: the user confirmed darkness after a Vibepollo
+disconnect with the lid open and normal restoration. Fake events establish
+scheduling, not panel darkness.
 
 There is no separate panel-control preference. Startup recovery honors recorded
 panel ownership, including keyboard-only journals from builds 11–12. The restore

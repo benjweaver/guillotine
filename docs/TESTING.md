@@ -149,5 +149,6 @@ callbacks, cancellation of pending work, virtual callbacks arriving first,
 and lid/system-sleep suppression. All 51 fake guard cases pass against the final
 universal build. The Developer ID signature and nested signatures verified,
 and build 18 was installed locally with controls restored and the app disabled.
-Hardware acceptance pending; notification latency may still permit a brief
-flash before Guillotine receives the event. No release has been published.
+Physical acceptance passed: the user confirmed the panel-flash fix works and
+authorized release. Version 1.0.2, build 19, contains the same control behavior;
+only release metadata changes from the tested build 18.

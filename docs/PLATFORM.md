@@ -1,17 +1,25 @@
 # Physical controls and closed-lid sleep prevention
 
-## Panel power transitions (build 13)
+## Panel power transitions (build 16)
 
-Every activation requests panel-off once; restoration requests panel-on. The
-periodic maintenance timer and wake notifications never reapply panel-off.
-macOS may relight the panel during lid-open or wake transitions; another off
-request requires restoring and activating again. There is no separate panel
-control preference. Startup recovery honors recorded panel ownership, including
-keyboard-only journals from builds 11–12. The restore shortcut while disabled
-still provides explicit panel-on rescue.
+Activation requests panel-off; restoration requests panel-on. CoreGraphics
+reconfiguration callbacks compare the online display layout, active and main
+states, mirroring, rotation, and mode. A changed configuration or workspace
+screen/system wake schedules one off request after a one-second settling delay,
+with at least three seconds between off writes. Additional events replace the
+pending timer. Unchanged layout notifications cannot create a feedback loop from
+our own panel request. No recurring panel-write timer or automatic retry exists.
 
-Closed-lid streaming remains unverified. For the current interim setup, leave
-the lid open and use Caffeine independently of Guillotine's optional sleep block.
+Event reapplication checks the lid immediately before writing; closed or unknown
+lid state suppresses it. System sleep cancels pending work, and restore-on-wake
+takes precedence. Lease expiry, restore requests, and battery/thermal policy also
+take precedence over a pending write. Physical acceptance after a Vibepollo
+disconnect remains required; fake events establish scheduling, not panel darkness.
+
+There is no separate panel-control preference. Startup recovery honors recorded
+panel ownership, including keyboard-only journals from builds 11–12. The restore
+shortcut while disabled still provides explicit panel-on rescue. Leave the lid
+open for the current workflow; closed-lid streaming remains unreliable.
 
 ## Why the implementation changed
 

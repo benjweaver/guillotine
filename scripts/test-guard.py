@@ -86,6 +86,78 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
         self.restored(recovered)
         self.assertEqual((self.folder / 'test-panel-requests').read_text(), '0\n1\n')
+    def hold_lease(self, child, seconds):
+        until = time.monotonic() + seconds
+        while time.monotonic() < until:
+            child.stdin.write(b'renew\n'); child.stdin.flush()
+            time.sleep(.1)
+    def panel_requests(self):
+        return (self.folder / 'test-panel-requests').read_text()
+    def wait_panel_requests(self, child, expected):
+        until = time.monotonic() + 5
+        while time.monotonic() < until:
+            if self.panel_requests() == expected:
+                return
+            self.hold_lease(child, .1)
+        self.assertEqual(self.panel_requests(), expected)
+    def test_remote_display_removal_reapplies_once_then_stays_idle(self):
+        configuration = self.folder / 'test-display-configuration'
+        configuration.write_text('built-in + virtual')
+        child = self.start(); self.ready(child)
+        configuration.write_text('built-in only')
+        self.wait_panel_requests(child, '0\n0\n')
+        # Duplicate callbacks for the same logical layout must not retrigger.
+        configuration.write_text('built-in only')
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.panel_requests(), '0\n0\n1\n')
+    def test_display_change_burst_coalesces_into_one_request(self):
+        child = self.start(); self.ready(child)
+        configuration = self.folder / 'test-display-configuration'
+        configuration.write_text('virtual removed')
+        self.hold_lease(child, 1.2)
+        configuration.write_text('built-in made main')
+        self.wait_panel_requests(child, '0\n0\n')
+        self.hold_lease(child, 2.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+    def test_display_wake_reapplies_without_a_layout_change(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-display-wake').touch()
+        self.wait_panel_requests(child, '0\n0\n')
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n0\n')
+    def test_lid_closed_or_unknown_suppresses_pending_panel_write(self):
+        for lid in ('closed', 'unknown'):
+            with self.subTest(lid=lid):
+                (self.folder / 'test-panel-requests').unlink(missing_ok=True)
+                child = self.start(); self.ready(child)
+                (self.folder / 'test-display-wake').touch()
+                self.hold_lease(child, 1.2)
+                (self.folder / 'test-lid').write_text(lid)
+                self.hold_lease(child, 2.2)
+                self.assertEqual(self.panel_requests(), '0\n')
+                child.stdin.close(); self.restored(child)
+    def test_disconnect_cancels_pending_display_reapply(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-display-wake').touch()
+        self.hold_lease(child, 1.2)
+        child.stdin.close(); self.restored(child)
+        time.sleep(2)
+        self.assertEqual(self.panel_requests(), '0\n1\n')
+    def test_system_sleep_cancels_reapply_and_wake_schedules_one(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-display-wake').touch()
+        (self.folder / 'test-system-notification').write_text('sleep')
+        self.hold_lease(child, 3.2)
+        self.assertEqual(self.panel_requests(), '0\n')
+        (self.folder / 'test-system-notification').write_text('wake')
+        self.wait_panel_requests(child, '0\n0\n')
+    def test_restore_on_system_wake_takes_precedence_over_panel_reapply(self):
+        child = self.start('--restore-on-wake'); self.ready(child)
+        (self.folder / 'test-system-notification').write_text('wake')
+        self.restored(child)
+        self.assertEqual(self.panel_requests(), '0\n1\n')
     def test_speakers_unchanged_when_option_off(self):
         self.set_mute(0)
         child = self.start(); self.ready(child)

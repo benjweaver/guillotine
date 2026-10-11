@@ -34,7 +34,7 @@ Prior UTM tests concern the earlier sleep-assertion implementation; see [histori
 | Lid close on AC | Enable closed-lid support, activate, monitor changing clock/video remotely, close 20 seconds, reopen. No Clamshell Sleep event; frames/input continue on the exact display/capture setup. |
 | Lid close on battery | Opt into battery operation, repeat. No Clamshell Sleep event while the lease is active. Keep normal thermal protections in force. |
 | Unplug closed lid | Battery use off: restore physical controls and owned sleep setting; normal clamshell policy may then sleep. Replug must not activate. Battery use on: continue without sleep; live opt-out restores. |
-| Panel/keyboard | Both physically dark on activation. Panel-off is requested once; macOS may relight it on lid opening or wake. Type and vary ambient light; keyboard zero reapplies within one second. Restore latest recorded keyboard brightness without changing auto-brightness. Repeat toggles. |
+| Panel/keyboard | Both physically dark on activation. Display changes and wake may briefly relight the panel; with the lid open, panel-off reapplies after events settle without recurring writes. Type and vary ambient light; keyboard zero reapplies within one second. Restore latest recorded keyboard brightness without changing auto-brightness. Repeat toggles. |
 | Built-in audio | With music/video playing, check Mute built-in speakers while headless while active: local speakers silent within one second, remote stream audio continues on the chosen host. Uncheck: previous mute returns, volume/routing unchanged. Repeat with already-muted speakers, quit, app crash, and power cutoff. Test virtual/external outputs remain unchanged. Audible and streaming results require hardware/client testing. |
 | Caffeine | With closed-lid option off, user sleep policy and Caffeine remain independent. With it on, global sleep is blocked; Caffeine’s own state remains unchanged. |
 | Lock/hotkey | Lock normally while headless; mode stays active. Test local and remote Control–Option–Command–Space at loginwindow. Authenticate normally. Hotkey delivery is not yet certified. |
@@ -95,3 +95,23 @@ closed-lid reliability remains unresolved.
 Release build had no compiler warnings, strict recursive signature verification
 passed outside the sandbox, and build 13 was installed and relaunched disabled.
 Panel activation and closed-lid streaming remain for physical acceptance.
+
+## Build 16 display-event reapplication
+
+The user reported that build 14 (same panel behavior as release 1.0.1) leaves the
+physical panel on after a Vibepollo disconnect with the lid open. The guard was
+still running with panel ownership journaled. WindowServer logged built-in power
+state 0 → 1 as the remote virtual display changed; no guard event handler existed
+to reapply off. This is a regression of the activation-only policy, separate from
+the unresolved closed-lid watchdog failure.
+
+Build 16 passed all 47 fake guard tests and 20 XCTest cases. The universal
+Developer ID build and nested signatures verified, and it was installed locally
+with controls restored. No new release has been published.
+
+Fake guard coverage now includes remote display removal, duplicate layout
+notifications, coalesced event bursts, wake without layout changes, closed/unknown
+lid suppression, cancellation at disconnect/system sleep, and restore-on-wake
+precedence. Hardware acceptance: enable Guillotine with the lid open, disconnect
+Vibepollo, confirm the physical panel returns dark within a few seconds, reconnect,
+and repeat. Confirm Restore still lights the panel. Results pending.

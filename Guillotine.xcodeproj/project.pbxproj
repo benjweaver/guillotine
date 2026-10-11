@@ -11,6 +11,7 @@
 		0AAD1529CC6537E53FF1B8B5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D0FBFEB53FF6EDC3666821AE /* main.m */; };
 		0CCB0257E2CC6DD921DE1FB3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 886F38EF08BBD5CF4562CE57 /* LICENSE */; };
 		0F8B53AAA0DAB71095F7F3E0 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
+		3322DADC350266EA1DF6D970 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 393E55AD60401CF253458DBA /* CoreGraphics.framework */; };
 		357323ABA6587F867DD82346 /* BatteryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8AE2734B5B46F10EDE6CB4 /* BatteryPolicy.swift */; };
 		3FC440EC5C337487FF145BAB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */; };
 		48212FE3735F7CDC61534F0F /* PhysicalControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B62001C26DA4C06385E6FC35 /* PhysicalControls.swift */; };
@@ -63,6 +64,7 @@
 		0EA41138E5959B15C70B8383 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		1AB403A034BE910093CE4540 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
 		391C5AE463B6BB3A7C3C8CE5 /* GuillotineLidHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = GuillotineLidHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		393E55AD60401CF253458DBA /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		3F8AE2734B5B46F10EDE6CB4 /* BatteryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPolicy.swift; sourceTree = "<group>"; };
 		488980E09E9EBAE78ED11836 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		49905AC2D92B0DC6540E6200 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -94,6 +96,7 @@
 			files = (
 				958073D6E826252BCB42B404 /* AppKit.framework in Frameworks */,
 				A322AFC75C9C3F9EA706CD9D /* CoreAudio.framework in Frameworks */,
+				3322DADC350266EA1DF6D970 /* CoreGraphics.framework in Frameworks */,
 				98251AB63F811D10CFD91ED2 /* IOKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -186,6 +189,7 @@
 				8095FC8E4B7EA1ECF5785866 /* AppKit.framework */,
 				BB71D6736DFB938115FE4BBF /* Carbon.framework */,
 				49905AC2D92B0DC6540E6200 /* CoreAudio.framework */,
+				393E55AD60401CF253458DBA /* CoreGraphics.framework */,
 				579F761C84A014C1C14C3D3B /* Foundation.framework */,
 				488980E09E9EBAE78ED11836 /* IOKit.framework */,
 				E0C3C432C065AE98283A637F /* ServiceManagement.framework */,
@@ -490,7 +494,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -609,7 +613,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;

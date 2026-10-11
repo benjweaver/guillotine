@@ -4,6 +4,10 @@ All notable changes are documented here using Keep a Changelog.
 
 ## Unreleased
 
+### Fixed
+
+- Reapply panel-off after settled display layout changes and wake while the lid is open, including remote display disconnection. Coalesce event bursts and ignore duplicate layouts instead of sending recurring panel requests.
+
 ### Changed
 
 - Relicensed from GPL-3.0-only to GPL-3.0-or-later, matching Ben's other apps.

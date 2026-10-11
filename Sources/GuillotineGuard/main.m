@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Ben Weaver and Guillotine contributors
 #import <AppKit/AppKit.h>
 #import <CoreAudio/CoreAudio.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <IOKit/IOKitLib.h>
 #import <IOKit/pwr_mgt/IOPMLib.h>
 #import <IOKit/pwr_mgt/IOPMLibDefs.h>
@@ -35,6 +36,10 @@ static BOOL allowBattery, closedLid, muteSpeakers;
 static NSInteger sleepBelow=10, lowPowerBelow;
 static io_connect_t powerConnection;
 static NSString *directory;
+static NSArray *lastDisplayConfiguration;
+static NSTimer *panelReapplyTimer;
+static NSTimeInterval lastPanelOff;
+static BOOL systemSleeping;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
 static BOOL saveJournal(void) {
     if (![saved writeToFile:journal atomically:YES]) return NO;
@@ -268,6 +273,73 @@ static BOOL maintainControls(NSString **error) {
     }
     return YES;
 }
+static BOOL lidIsOpen(void) {
+    if (fake) {
+        NSString *state=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"test-lid"] encoding:NSUTF8StringEncoding error:nil];
+        return !state || [state isEqualToString:@"open"];
+    }
+    io_service_t root=IOServiceGetMatchingService(kIOMainPortDefault,IOServiceMatching("IOPMrootDomain"));
+    if (!root) return NO;
+    id closed=CFBridgingRelease(IORegistryEntryCreateCFProperty(root,CFSTR("AppleClamshellState"),NULL,0));
+    IOObjectRelease(root);
+    // Unknown lid state must not start fighting a clamshell transition.
+    return [closed isKindOfClass:NSNumber.class] && ![closed boolValue];
+}
+static NSArray *displayConfiguration(void) {
+    if (fake) {
+        NSString *state=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"test-display-configuration"] encoding:NSUTF8StringEncoding error:nil];
+        return @[state ?: @"initial"];
+    }
+    uint32_t count=0;
+    if (CGGetOnlineDisplayList(0,NULL,&count)!=kCGErrorSuccess) return nil;
+    NSMutableData *storage=[NSMutableData dataWithLength:count*sizeof(CGDirectDisplayID)];
+    CGDirectDisplayID *displays=storage.mutableBytes;
+    if (CGGetOnlineDisplayList(count,displays,&count)!=kCGErrorSuccess) return nil;
+    NSMutableDictionary *configuration=[NSMutableDictionary dictionary];
+    for (uint32_t i=0;i<count;i++) {
+        CGDirectDisplayID display=displays[i];
+        CGDisplayModeRef mode=CGDisplayCopyDisplayMode(display);
+        configuration[@(display)]=@[
+            [NSValue valueWithRect:NSRectFromCGRect(CGDisplayBounds(display))],
+            @(CGDisplayIsActive(display)), @(CGDisplayIsMain(display)),
+            @(CGDisplayMirrorsDisplay(display)), @(CGDisplayRotation(display)),
+            @(mode?CGDisplayModeGetPixelWidth(mode):0),
+            @(mode?CGDisplayModeGetPixelHeight(mode):0),
+            @(mode?CGDisplayModeGetRefreshRate(mode):0)];
+        if (mode) CGDisplayModeRelease(mode);
+    }
+    return @[configuration];
+}
+static void schedulePanelOff(void) {
+    if (!ready || finished) return;
+    [panelReapplyTimer invalidate];
+    // Coalesce a reconfiguration burst, with at least three seconds between
+    // writes. No retry timer is armed after a write: only a new event can do so.
+    NSTimeInterval delay=MAX(1,3-(NSProcessInfo.processInfo.systemUptime-lastPanelOff));
+    panelReapplyTimer=[NSTimer scheduledTimerWithTimeInterval:delay repeats:NO block:^(NSTimer *timer){
+        panelReapplyTimer=nil;
+        if (finished || systemSleeping || !lidIsOpen()) return;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
+            finish(0,@"Remote restoration requested");
+        }
+        if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
+        enforcePolicy();
+        if (!requestPanelPower(0)) finish(2,@"Panel power control failed after display transition");
+        lastPanelOff=NSProcessInfo.processInfo.systemUptime;
+        NSLog(@"Panel-off requested after settled display transition");
+    }];
+}
+static void displayConfigurationChanged(void) {
+    NSArray *configuration=displayConfiguration();
+    if (!configuration || [configuration isEqual:lastDisplayConfiguration]) return;
+    lastDisplayConfiguration=configuration;
+    schedulePanelOff();
+}
+static void displayReconfigured(CGDirectDisplayID display, CGDisplayChangeSummaryFlags flags, void *context) {
+    if (flags & kCGDisplayBeginConfigurationFlag) return;
+    // Apple requires callbacks to avoid changing display configuration inline.
+    dispatch_async(dispatch_get_main_queue(),^{ displayConfigurationChanged(); });
+}
 static BOOL loadHardware(BOOL needsPanel, NSString **error) {
     if (fake) return YES;
 #if !defined(__arm64__)
@@ -356,14 +428,17 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (power) CFRunLoopAddSource(CFRunLoopGetMain(),power,kCFRunLoopCommonModes);
     [NSNotificationCenter.defaultCenter addObserverForName:NSProcessInfoThermalStateDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ if (ready) enforcePolicy(); }];
     if (!maintainControls(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
-    // Panel power is a session transition, not a periodically enforced policy.
-    // Repeated requests can compete with macOS lid and display wake transitions.
+    // Activation and settled display events own panel writes, never lease renewals.
     // Ownership was journaled before this write so failures and crashes can restore it.
     if (!requestPanelPower(0)) {
         emit(@"ERROR macOS rejected built-in panel power control.");
         finish(2,@"Panel power control failed");
     }
+    lastPanelOff=NSProcessInfo.processInfo.systemUptime;
+    lastDisplayConfiguration=displayConfiguration();
     ready=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
+    if (!fake && CGDisplayRegisterReconfigurationCallback(displayReconfigured,NULL)!=kCGErrorSuccess)
+        finish(2,@"Could not observe display configuration changes");
     emit(@"READY");
     fcntl(STDIN_FILENO,F_SETFL,O_NONBLOCK);
     dispatch_source_t input=dispatch_source_create(DISPATCH_SOURCE_TYPE_READ,STDIN_FILENO,0,dispatch_get_main_queue());
@@ -409,13 +484,16 @@ int main(int argc, char **argv) { @autoreleasepool {
     }
     NSNotificationCenter *workspace=NSWorkspace.sharedWorkspace.notificationCenter;
     [workspace addObserverForName:NSWorkspaceWillSleepNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){
+        systemSleeping=YES;
+        [panelReapplyTimer invalidate]; panelReapplyTimer=nil;
         if (restoreSleep) finish(0,@"Sleep restoration enabled");
         else { sleepPending=YES; deadline=NSProcessInfo.processInfo.systemUptime+8; }
     }];
     [workspace addObserverForName:NSWorkspaceDidWakeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){
         if (restoreWake) finish(0,@"Wake restoration enabled");
-        else { sleepPending=NO; deadline=NSProcessInfo.processInfo.systemUptime+8; }
+        else { systemSleeping=NO; sleepPending=NO; deadline=NSProcessInfo.processInfo.systemUptime+8; schedulePanelOff(); }
     }];
+    [workspace addObserverForName:NSWorkspaceScreensDidWakeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n){ schedulePanelOff(); }];
     [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer){
         if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
             [[NSFileManager defaultManager] removeItemAtPath:restoreRequest error:nil];
@@ -426,6 +504,21 @@ int main(int argc, char **argv) { @autoreleasepool {
         if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
         NSString *failure=nil;
         if (!maintainControls(&failure)) finish(2,failure);
+        if (fake) {
+            displayConfigurationChanged();
+            NSString *wake=[directory stringByAppendingPathComponent:@"test-display-wake"];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:wake]) {
+                [[NSFileManager defaultManager] removeItemAtPath:wake error:nil];
+                [workspace postNotificationName:NSWorkspaceScreensDidWakeNotification object:nil];
+            }
+            NSString *notificationPath=[directory stringByAppendingPathComponent:@"test-system-notification"];
+            NSString *event=[NSString stringWithContentsOfFile:notificationPath encoding:NSUTF8StringEncoding error:nil];
+            if (event) {
+                [[NSFileManager defaultManager] removeItemAtPath:notificationPath error:nil];
+                if ([event isEqualToString:@"sleep"]) [workspace postNotificationName:NSWorkspaceWillSleepNotification object:nil];
+                else if ([event isEqualToString:@"wake"]) [workspace postNotificationName:NSWorkspaceDidWakeNotification object:nil];
+            }
+        }
     }];
     [[NSRunLoop mainRunLoop] run];
     return 0;

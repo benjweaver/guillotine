@@ -1,8 +1,10 @@
 # Physical controls and closed-lid sleep prevention
 
-## Panel power transitions (build 16)
+## Panel power transitions (build 17)
 
-Activation requests panel-off; restoration requests panel-on. CoreGraphics
+Activation requests panel-off; restoration requests panel-on. The guard runs a
+hidden AppKit application event loop: a plain NSRunLoop did not deliver display
+callbacks in the physical disconnect test. CoreGraphics
 reconfiguration callbacks compare the online display layout, active and main
 states, mirroring, rotation, and mode. A changed configuration or workspace
 screen/system wake schedules one off request after a one-second settling delay,

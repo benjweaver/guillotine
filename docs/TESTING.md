@@ -114,4 +114,21 @@ notifications, coalesced event bursts, wake without layout changes, closed/unkno
 lid suppression, cancellation at disconnect/system sleep, and restore-on-wake
 precedence. Hardware acceptance: enable Guillotine with the lid open, disconnect
 Vibepollo, confirm the physical panel returns dark within a few seconds, reconnect,
-and repeat. Confirm Restore still lights the panel. Results pending.
+and repeat. Confirm Restore still lights the panel. **Build 16 failed:** the
+user confirmed the panel stayed lit after disconnect. Its guard logged no
+event-driven reapplication despite WindowServer recording built-in power-on.
+The logical-layout/workspace observers are insufficient in this configuration;
+notification delivery and a panel-specific signal need further investigation.
+
+## Build 17 display callback delivery
+
+During the repeat disconnect/reconnect, two read-only probes watched the same
+Mac. The plain NSRunLoop probe received zero CoreGraphics callbacks. The hidden
+NSApplication probe received 16 callbacks and seven screen-parameter
+notifications. Neither received a workspace screen-wake notification. The
+panel's displayOnTimestamp changed once; registry CurrentPowerState remained
+unsuitable as a physical measurement. The guard now uses the proven AppKit event
+pump for real sessions; recovery remains short-lived, and fake tests stay out of
+the GUI session. The universal Developer ID build, nested signatures, and seven
+display-event regression cases passed; build 17 was installed locally with
+controls restored. Hardware retest pending.

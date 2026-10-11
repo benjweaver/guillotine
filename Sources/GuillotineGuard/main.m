@@ -412,6 +412,14 @@ int main(int argc, char **argv) { @autoreleasepool {
         }
         emit(@"RECOVERED"); return 0;
     }
+    // CoreGraphics delivers display callbacks through AppKit's event pump.
+    // A plain NSRunLoop receives our timers/pipe but misses reconfiguration.
+    // Recovery commands need no event pump, and fake tests must not join the UI.
+    NSApplication *application=nil;
+    if (!fake) {
+        application=NSApplication.sharedApplication;
+        [application setActivationPolicy:NSApplicationActivationPolicyProhibited];
+    }
     if (!externalPower() && (!allowBattery || tooHot())) { emit(@"ERROR Battery use is disabled or macOS thermal pressure is too high. Connect power or wait for cooling."); return 2; }
     NSMutableDictionary *values=[NSMutableDictionary dictionary];
     NSArray *ids=fake?@[@1]:[keyboard copyKeyboardBacklightIDs];
@@ -520,6 +528,7 @@ int main(int argc, char **argv) { @autoreleasepool {
             }
         }
     }];
-    [[NSRunLoop mainRunLoop] run];
+    if (application) [application run];
+    else [[NSRunLoop mainRunLoop] run];
     return 0;
 }}

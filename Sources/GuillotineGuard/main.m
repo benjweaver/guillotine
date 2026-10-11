@@ -28,12 +28,6 @@ static BOOL fake, finished, ready, restoreSleep, restoreWake, sleepPending;
 static NSTimeInterval deadline;
 static int lockFD;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
-static BOOL externalPower(void) {
-    if (fake) return YES;
-    CFTypeRef info=IOPSCopyPowerSourcesInfo(); if (!info) return NO;
-    CFStringRef type=IOPSGetProvidingPowerSourceType(info);
-    BOOL ac=type && CFEqual(type, CFSTR(kIOPSACPowerValue)); CFRelease(info); return ac;
-}
 static BOOL saveJournal(void) {
     if (![saved writeToFile:journal atomically:YES]) return NO;
     int descriptor=open(journal.fileSystemRepresentation,O_RDONLY);
@@ -61,7 +55,6 @@ static void finish(int code, NSString *reason) {
     exit(restored?code:3);
 }
 static BOOL applyOff(NSString **error) {
-    if (!externalPower()) { *error=@"External power is required."; return NO; }
     NSMutableDictionary *values=saved[@"keyboards"];
     for (NSString *key in values.allKeys) {
         uint64_t kid=key.longLongValue;
@@ -106,9 +99,6 @@ static BOOL loadHardware(NSString **error) {
     }
     return YES;
 }
-static void powerChanged(void *context) {
-    if (ready && !externalPower()) finish(0,@"External power disconnected");
-}
 int main(int argc, char **argv) { @autoreleasepool {
     signal(SIGPIPE,SIG_IGN);
     NSArray *args=NSProcessInfo.processInfo.arguments;
@@ -133,7 +123,6 @@ int main(int argc, char **argv) { @autoreleasepool {
     saved=[[NSDictionary dictionaryWithContentsOfFile:journal] mutableCopy];
     if (saved && !restore()) { emit(@"ERROR Previous hardware session could not be restored. Restart macOS or retry."); return 3; }
     if ([args containsObject:@"--recover"] || [args containsObject:@"--restore"]) { emit(@"RECOVERED"); return 0; }
-    if (!externalPower()) { emit(@"ERROR Connect external power before cutting the lights."); return 2; }
     NSMutableDictionary *values=[NSMutableDictionary dictionary];
     NSArray *ids=fake?@[@1]:[keyboard copyKeyboardBacklightIDs];
     for (NSNumber *kid in ids) {
@@ -144,10 +133,6 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!values.count) { emit(@"ERROR No supported backlit keyboard found."); return 2; }
     saved=[@{@"panelOwned":@YES,@"keyboards":values} mutableCopy];
     if (!saveJournal()) { emit(@"ERROR Could not save restoration journal; nothing changed."); return 2; }
-    // Independent power notifications: parent actor stalls cannot delay AC restoration.
-    CFRunLoopSourceRef power=IOPSNotificationCreateRunLoopSource(powerChanged,NULL);
-    if (!power && !fake) { finish(2,@"Power notification setup failed"); }
-    if (power) CFRunLoopAddSource(CFRunLoopGetMain(),power,kCFRunLoopCommonModes);
     if (!applyOff(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
     ready=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
     emit(@"READY");
@@ -182,7 +167,6 @@ int main(int argc, char **argv) { @autoreleasepool {
         // Grant one bounded wake grace even if the workspace wake notice is delayed.
         if (sleepPending) { sleepPending=NO; deadline=NSProcessInfo.processInfo.systemUptime+8; }
         if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
-        if (!externalPower()) finish(0,@"External power disconnected");
         NSString *failure=nil;
         if (!applyOff(&failure)) finish(2,failure);
     }];

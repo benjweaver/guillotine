@@ -36,38 +36,38 @@ import Carbon
         XCTAssertFalse(controller.enabled)
         XCTAssertEqual(assertion.acquisitions, 0)
     }
-    func testBatteryUPSAndUnknownCannotActivate() {
+    func testBatteryUPSAndUnknownCanActivate() {
         for power in [PowerState.battery, .ups, .unknown] {
             let assertion = Assertion()
             let controller = make(assertion, read: { power })
             controller.enable()
-            XCTAssertFalse(controller.enabled)
-            XCTAssertNotNil(controller.error)
-            XCTAssertEqual(assertion.acquisitions, 0)
+            XCTAssertTrue(controller.enabled)
+            XCTAssertNil(controller.error)
+            XCTAssertEqual(assertion.acquisitions, 1)
         }
     }
-    func testUnplugImmediatelyReleasesAndReplugDoesNotEnable() {
+    func testUnplugAndReplugPreserveActiveSession() {
         let assertion = Assertion()
         let controller = make(assertion)
         controller.enable()
         controller.powerChanged(.battery)
-        XCTAssertFalse(controller.enabled)
-        XCTAssertFalse(assertion.owned)
-        XCTAssertEqual(assertion.releases, 1)
+        XCTAssertTrue(controller.enabled)
+        XCTAssertTrue(assertion.owned)
+        XCTAssertEqual(assertion.releases, 0)
         controller.powerChanged(.external)
-        XCTAssertFalse(controller.enabled)
+        XCTAssertTrue(controller.enabled)
         XCTAssertEqual(assertion.acquisitions, 1)
     }
-    func testUnknownAndUPSAlsoRelease() {
+    func testUnknownAndUPSPreserveSession() {
         for power in [PowerState.unknown, .ups] {
             let assertion = Assertion()
             let controller = make(assertion)
             controller.enable()
             controller.powerChanged(power)
-            XCTAssertFalse(assertion.owned)
+            XCTAssertTrue(assertion.owned)
         }
     }
-    func testActivationRechecksPowerAfterAcquiring() {
+    func testPowerChangingDuringActivationIsInformational() {
         let assertion = Assertion()
         var reads = 0
         let controller = make(assertion) {
@@ -75,17 +75,19 @@ import Carbon
             return reads == 1 ? .external : .battery
         }
         controller.enable()
-        XCTAssertFalse(controller.enabled)
+        XCTAssertTrue(controller.enabled)
+        XCTAssertEqual(controller.power, .battery)
         XCTAssertEqual(assertion.acquisitions, 1)
-        XCTAssertEqual(assertion.releases, 1)
+        XCTAssertEqual(assertion.releases, 0)
     }
-    func testActivationDoesNotTrustCachedAC() {
+    func testBatteryActivationRefreshesPowerStatus() {
         let assertion = Assertion()
         let controller = make(assertion, read: { .battery })
         controller.powerChanged(.external)
         controller.enable()
-        XCTAssertFalse(controller.enabled)
-        XCTAssertEqual(assertion.acquisitions, 0)
+        XCTAssertTrue(controller.enabled)
+        XCTAssertEqual(controller.power, .battery)
+        XCTAssertEqual(assertion.acquisitions, 1)
     }
     func testRepeatedTogglesAreBalancedAndIdempotent() {
         let assertion = Assertion()
@@ -100,17 +102,18 @@ import Carbon
         XCTAssertEqual(assertion.releases, 100)
         XCTAssertFalse(assertion.owned)
     }
-    func testMissingNotificationsOrShortcutBlocksActivation() {
+    func testNotificationsAreOptionalButShortcutIsRequired() {
         let assertion = Assertion()
         let controller = make(assertion)
         controller.monitoringAvailable = false
         controller.enable()
-        XCTAssertFalse(controller.enabled)
+        XCTAssertTrue(controller.enabled)
+        controller.disable()
         controller.monitoringAvailable = true
         controller.shortcutAvailable = false
         controller.enable()
         XCTAssertFalse(controller.enabled)
-        XCTAssertEqual(assertion.acquisitions, 0)
+        XCTAssertEqual(assertion.acquisitions, 1)
     }
     func testAcquireFailureLeavesNoEnabledState() {
         let assertion = Assertion()

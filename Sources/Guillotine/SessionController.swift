@@ -45,38 +45,21 @@ enum PowerState: String, Equatable {
 
     func powerChanged(_ value: PowerState) {
         power = value
-        if value != .external && enabled {
-            disable(reason: "Guillotine turned off: \(value.label.lowercased()).")
-        }
         onChange?()
     }
 
     func enable() {
         guard !enabled else { return }
         error = nil
-        guard monitoringAvailable else {
-            fail("Power notifications are unavailable. Quit and reopen Guillotine before enabling.")
-            return
-        }
         guard shortcutAvailable else {
             fail("The disable shortcut is unavailable. Choose an unused shortcut in Settings.")
             return
         }
-        // Never trust the cached menu value before taking ownership of physical controls.
         power = readPower()
-        guard power == .external else {
-            fail("Connect external power before enabling Guillotine. Charging is not required.")
-            return
-        }
         do {
             try controls.acquire()
             enabled = true
-            // Close the check/acquire window. The notification source handles later changes.
             power = readPower()
-            if power != .external {
-                disable(reason: "Power changed during activation; Guillotine turned off.")
-                return
-            }
             message = "Built-in panel power and keyboard backlight off requested. Sleep settings unchanged."
             onChange?()
         } catch {

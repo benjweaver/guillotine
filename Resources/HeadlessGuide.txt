@@ -19,7 +19,8 @@ value is journaled for restoration. Keyboard auto-brightness is not changed.
 No virtual display is created or altered. Real capture compatibility still
 requires a progressing-frame/input test on the exact streaming stack.
 
-External-power loss, app quit/crash or a five-second lease expiry restores
+Works on battery or external power; plugging/unplugging preserves the mode.
+App quit/crash or a five-second lease expiry restores
 physical controls through a bundled nonprivileged guard. If the guard itself
 is killed, reopen Guillotine to recover its journal. If recovery fails,
 restart macOS. There is no root service or SIP change.

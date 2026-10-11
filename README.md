@@ -12,11 +12,11 @@ No brightness-to-zero substitute is used for the screen. The keyboard's backligh
 
 ## Use
 
-1. Connect external power. Full battery and optimized charging count as plugged in.
+1. Use external power or battery; the reported power source is informational.
 2. Click the guillotine menu icon → **Cut Screen & Keyboard**, or use Settings. Both physical controls switch off immediately; the icon fills while the guard owns them.
 3. Restore with **Control–Option–Command–Space**, the menu, or Quit. Fn is optional in Settings. The local Vibepollo input source forwards Control/Option/Command but has no Fn mapping, so the default omits Fn for remote use.
 4. Lock does not change the mode. It also stays active through system sleep/wake by default. Optional restore-on-sleep and restore-on-wake settings apply on the next activation. Normal sleep still suspends streaming; Guillotine does not keep the Mac awake.
-5. External-power loss, app exit/crash, or a stopped heartbeat restores physical controls. Reconnecting power does not reactivate. Launch and login always start restored.
+5. App exit/crash or a stopped heartbeat restores physical controls. Plugging/unplugging power preserves the current mode. Launch and login always start restored.
 
 The shortcut is registered exclusively so macOS reports registered conflicts. **Lock-screen and Secure Input delivery are not certified**; remote input reaching loginwindow is not proof a user-session Carbon hotkey is delivered. A remote client must forward the selected keys. The UI remains authenticated and no lock-screen bypass is installed. See the manual acceptance tests before relying on lock-screen recovery. A same-user SSH recovery command works independently of keyboard routing and leaves the Mac locked:
 
@@ -28,7 +28,7 @@ System transitions can briefly wake the panel/backlight before the guard reappli
 
 ## Restoration and guard
 
-`Guillotine.app/Contents/Helpers/GuillotineGuard` is a bundled, signed, **nonprivileged** user process. No root service, installer, SIP change or background daemon is required. The app renews a five-second lease over an anonymous pipe. Pipe EOF, lease expiry, SIGTERM, or independent IOKit AC notifications trigger restoration. Sleep/wake notifications grant a bounded eight-second grace for the parent to renew; the lease is never made indefinite. The default never restores merely because the screen locks.
+`Guillotine.app/Contents/Helpers/GuillotineGuard` is a bundled, signed, **nonprivileged** user process. No root service, installer, SIP change or background daemon is required. The app renews a five-second lease over an anonymous pipe. Pipe EOF, lease expiry, or SIGTERM trigger restoration. Sleep/wake notifications grant a bounded eight-second grace for the parent to renew; the lease is never made indefinite. The default never restores merely because the screen locks.
 
 Before a hardware write, the guard atomically writes and fsyncs `~/Library/Application Support/Guillotine/hardware-session.plist`. An exclusive file lock prevents two guards owning the same hardware. An app restart recovers a killed guard's journal before activation. A killed guard itself cannot execute cleanup: app recovery or the next launch retries restoration. If APIs become unavailable, restart macOS and report the error.
 

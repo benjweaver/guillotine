@@ -57,6 +57,92 @@ class HelperTests(unittest.TestCase):
         self.start()
         self.assertFalse((self.folder/'value').exists())
         self.assertFalse((self.folder/'lid-session.plist').exists())
+    def low_profile(self):
+        path = self.folder / 'host-power-profile.plist'
+        return plistlib.loads(path.read_bytes()).get('Battery Power', {}) if path.exists() else {}
+    def set_low_profile(self, settings):
+        path = self.folder / 'host-power-profile.plist'
+        host = plistlib.loads(path.read_bytes()) if path.exists() else {}
+        host['Battery Power'] = settings
+        path.write_bytes(plistlib.dumps(host))
+    def test_low_power_uses_host_battery_profile_and_preserves_global_and_ac(self):
+        (self.folder/'power').write_text('battery')
+        global_path=self.folder/'global-power-profile.plist'
+        global_bytes=plistlib.dumps({'Battery Power':{'LowPowerMode':2}, 'SystemPowerSettings':{'SleepDisabled':False}})
+        global_path.write_bytes(global_bytes)
+        host_path=self.folder/'host-power-profile.plist'
+        original={'Battery Power':{'LowPowerMode':0,'other':42},'AC Power':{'LowPowerMode':2,'other':99}}
+        host_path.write_bytes(plistlib.dumps(original))
+        child=self.start(); self.assertTrue(self.send(child,'renew battery=1 lid=0 lowpower=1').startswith('OK'))
+        self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        self.assertEqual(plistlib.loads(host_path.read_bytes())['AC Power'],original['AC Power'])
+        self.send(child,'end')
+        self.assertEqual(plistlib.loads(host_path.read_bytes()),original)
+        self.assertEqual(global_path.read_bytes(),global_bytes)
+    def test_low_power_only_never_blocks_sleep(self):
+        (self.folder/'power').write_text('battery')
+        self.set_low_profile({'LowPowerMode': 0, 'other': 42})
+        child=self.start(); self.assertTrue(self.send(child,'renew battery=1 lid=0 lowpower=1').startswith('OK'))
+        self.assertEqual(self.value(),0)
+        self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        child.stdin.close(); child.wait(timeout=3)
+        self.assertEqual(self.low_profile(),{'LowPowerMode':0,'other':42})
+    def test_low_power_absent_key_and_unrelated_changes_restore(self):
+        (self.folder/'power').write_text('battery')
+        self.set_low_profile({'other':42})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1')
+        self.set_low_profile({'LowPowerMode':1,'other':99})
+        self.send(child,'end')
+        self.assertEqual(self.low_profile(),{'other':99})
+        self.assertFalse((self.folder/'low-power-session.plist').exists())
+    def test_preexisting_low_power_is_preserved(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':1})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1'); self.send(child,'end')
+        self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        self.assertFalse((self.folder/'low-power-session.plist').exists())
+    def test_preexisting_low_power_user_opt_out_is_respected(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':1})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1')
+        self.set_low_profile({'LowPowerMode':0})
+        self.assertTrue(self.send(child,'renew battery=1 lid=0 lowpower=1').startswith('NO'))
+        self.assertEqual(self.low_profile()['LowPowerMode'],0)
+    def test_existing_high_power_mode_restores(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':2})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1'); self.send(child,'end')
+        self.assertEqual(self.low_profile()['LowPowerMode'],2)
+    def test_user_low_power_change_stops_lease_and_is_preserved(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':0})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1')
+        self.set_low_profile({'LowPowerMode':2})
+        self.assertTrue(self.send(child,'renew battery=1 lid=0 lowpower=1').startswith('NO'))
+        self.assertEqual(self.low_profile()['LowPowerMode'],2)
+    def test_low_power_disabled_on_ac_and_restored_when_plugged_in(self):
+        self.set_low_profile({'LowPowerMode':0}); child=self.start()
+        self.send(child,'renew battery=1 lid=0 lowpower=1'); self.assertEqual(self.low_profile()['LowPowerMode'],0)
+        (self.folder/'power').write_text('battery'); self.send(child,'renew battery=1 lid=0 lowpower=1')
+        self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        (self.folder/'power').write_text('ac'); time.sleep(1.2)
+        self.assertEqual(self.low_profile()['LowPowerMode'],0)
+    def test_low_power_daemon_crash_recovery(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'other':1})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1'); child.kill(); child.wait(timeout=2)
+        self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        self.start(); self.assertEqual(self.low_profile(),{'other':1})
+    def test_low_power_lease_expiry_restores(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':0})
+        child=self.start(); self.send(child,'renew battery=1 lid=0 lowpower=1'); time.sleep(6.2)
+        self.assertEqual(self.low_profile()['LowPowerMode'],0)
+        self.assertTrue(self.send(child,'renew battery=1 lid=0 lowpower=1').startswith('NO'))
+    def test_low_power_absent_key_interrupted_restoration(self):
+        self.set_low_profile({'LowPowerMode':0, 'other':1})
+        (self.folder/'low-power-session.plist').write_bytes(plistlib.dumps({'original':0,'originalPresent':False,'restoring':True}))
+        self.start(); self.assertEqual(self.low_profile(),{'other':1})
+    def test_low_power_thermal_and_battery_revocation_cleanup(self):
+        (self.folder/'power').write_text('battery'); self.set_low_profile({'LowPowerMode':0})
+        child=self.start(); self.send(child,'renew battery=1 lowpower=1')
+        self.assertEqual(self.value(),1); self.assertEqual(self.low_profile()['LowPowerMode'],1)
+        (self.folder/'hot').touch(); time.sleep(1.2)
+        self.assertEqual(self.value(),0); self.assertEqual(self.low_profile()['LowPowerMode'],0)
     def test_signal_cleanup(self):
         child=self.start(); self.send(child,'renew'); child.terminate(); child.wait(timeout=3)
         self.assertEqual(self.value(),0)

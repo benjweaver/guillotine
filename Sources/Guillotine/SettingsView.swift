@@ -41,6 +41,45 @@ import ServiceManagement
         catch { lidHelperError = error.localizedDescription }
         refreshLidHelper()
     }
+    private let energyDefaults: UserDefaults
+    var energyPolicyChanged: (() -> Void)?
+    @Published var batterySleepEnabled: Bool {
+        didSet { energyDefaults.set(batterySleepEnabled, forKey: "batterySleepEnabled"); energyPolicyChanged?() }
+    }
+    @Published var batterySleepPercentage: Int {
+        didSet {
+            let bounded = BatteryPolicy.percentage(batterySleepPercentage)
+            if batterySleepPercentage != bounded { batterySleepPercentage = bounded; return }
+            energyDefaults.set(batterySleepPercentage, forKey: "batterySleepPercentage")
+            energyPolicyChanged?()
+        }
+    }
+    @Published var lowPowerPolicy: LowPowerPolicy {
+        didSet { energyDefaults.set(lowPowerPolicy.rawValue, forKey: "lowPowerPolicy"); energyPolicyChanged?() }
+    }
+    @Published var lowPowerPercentage: Int {
+        didSet {
+            let bounded = BatteryPolicy.percentage(lowPowerPercentage)
+            if lowPowerPercentage != bounded { lowPowerPercentage = bounded; return }
+            energyDefaults.set(lowPowerPercentage, forKey: "lowPowerPercentage")
+            energyPolicyChanged?()
+        }
+    }
+    init(defaults: UserDefaults = .standard) {
+        energyDefaults = defaults
+        batterySleepEnabled = defaults.object(forKey: "batterySleepEnabled") == nil ? true : defaults.bool(forKey: "batterySleepEnabled")
+        batterySleepPercentage = BatteryPolicy.percentage(defaults.object(forKey: "batterySleepPercentage") as? Int ?? BatteryPolicy.defaultSleepPercentage)
+        lowPowerPolicy = LowPowerPolicy(rawValue: defaults.integer(forKey: "lowPowerPolicy")) ?? .off
+        lowPowerPercentage = BatteryPolicy.percentage(defaults.object(forKey: "lowPowerPercentage") as? Int ?? BatteryPolicy.defaultLowPowerPercentage)
+    }
+    var sleepThreshold: Int { batterySleepEnabled ? batterySleepPercentage : 0 }
+    var lowPowerThreshold: Int {
+        switch lowPowerPolicy {
+        case .off: return 0
+        case .onBattery: return 100
+        case .belowPercentage: return lowPowerPercentage
+        }
+    }
     var speakerPolicyChanged: ((Bool) -> Void)?
     @Published var muteSpeakers = UserDefaults.standard.bool(forKey: "muteSpeakers") {
         didSet { UserDefaults.standard.set(muteSpeakers, forKey: "muteSpeakers"); speakerPolicyChanged?(muteSpeakers) }
@@ -135,9 +174,31 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Allow on battery", isOn: $preferences.allowBattery)
                 Text("Off by default. When off, unplugging restores immediately. Battery sessions restore and request sleep at serious or critical macOS thermal pressure.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Sleep at a battery percentage", isOn: $preferences.batterySleepEnabled)
+                if preferences.batterySleepEnabled {
+                    HStack {
+                        Text("Sleep at or below")
+                        TextField("Battery percentage", value: $preferences.batterySleepPercentage, format: .number).frame(width: 45)
+                        Text("%")
+                        Stepper("Battery sleep percentage", value: $preferences.batterySleepPercentage, in: 1...100).labelsHidden()
+                    }
+                }
+                Text("Only while headless on battery. Restores controls before requesting sleep. Turn off to let macOS handle a depleted battery normally.").font(.caption).foregroundStyle(.secondary)
+                Picker("Low Power Mode", selection: $preferences.lowPowerPolicy) {
+                    ForEach(LowPowerPolicy.allCases) { Text($0.label).tag($0) }
+                }
+                if preferences.lowPowerPolicy == .belowPercentage {
+                    HStack {
+                        Text("Enable at or below")
+                        TextField("Low Power Mode battery percentage", value: $preferences.lowPowerPercentage, format: .number).frame(width: 45)
+                        Text("%")
+                        Stepper("Low Power Mode percentage", value: $preferences.lowPowerPercentage, in: 1...100).labelsHidden()
+                    }
+                }
+                Text("Low Power Mode can reduce heat while running on battery, which may help avoid thermal limits. Requires the approved power helper; restores the prior battery setting afterward. Battery options apply live while headless.").font(.caption).foregroundStyle(.secondary)
                 Toggle("Allow closed-lid operation (requires helper)", isOn: $preferences.closedLid)
                 Text("Temporarily sets global SleepDisabled while active. This also blocks ordinary/manual sleep until restored. Original value is journaled by a privileged, leased helper. Capture may still need a virtual display/adapter; physical testing remains required.").font(.caption).foregroundStyle(.secondary)
-                Text("Closed-lid helper: \(preferences.lidHelperStatus)").font(.caption)
+                Text("Power helper: \(preferences.lidHelperStatus)").font(.caption)
                 HStack {
                     switch preferences.lidHelperState {
                     case .enabled:

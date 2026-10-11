@@ -9,12 +9,13 @@
 #import <SystemConfiguration/SystemConfiguration.h>
 #import <notify.h>
 #import "../Shared/LidService.h"
+#import "LowPowerControl.h"
 
-// Only one fixed pmset key is writable. No caller-supplied commands, paths or settings.
+// Only fixed SleepDisabled and battery LowPowerMode keys are writable. No caller-supplied commands, paths or settings.
 static BOOL fake;
 static NSString *folder, *journal;
 static NSDictionary *owned;
-static BOOL active, blocked, allowBattery;
+static BOOL active, leaseActive, blocked, allowBattery;
 static NSTimeInterval deadline, emergencySleepAt;
 static NSXPCConnection *owner;
 static NSString *reason=@"Ready";
@@ -81,7 +82,7 @@ static BOOL save(void) {
     int dir=open(folder.fileSystemRepresentation,O_RDONLY);
     ok=dir>=0 && fsync(dir)==0 && ok; if (dir>=0) close(dir); return ok;
 }
-static BOOL restore(void) {
+static BOOL restoreSleep(void) {
     if (!owned) { active=NO; return YES; }
     NSInteger current=sleepDisabled(); if (current<0) return NO;
     // Compare-and-restore only our value. Other pmset keys and changed values are untouched.
@@ -95,11 +96,17 @@ static BOOL restore(void) {
     if ([[NSFileManager defaultManager] fileExistsAtPath:journal] && ![[NSFileManager defaultManager] removeItemAtPath:journal error:nil]) return NO;
     owned=nil; active=NO; return YES;
 }
+static BOOL restore(void) {
+    BOOL sleepOK=restoreSleep();
+    BOOL lowPowerOK=restoreLowPowerControl();
+    leaseActive=NO;
+    return sleepOK && lowPowerOK;
+}
 static void stop(NSString *why) {
     reason=why; blocked=YES;
-    if (!restore()) reason=[why stringByAppendingString:@"; sleep-setting restoration failed; retry recovery"];
+    if (!restore()) reason=[why stringByAppendingString:@"; power-setting restoration failed; retry recovery"];
 }
-static BOOL renew(BOOL allowed) {
+static BOOL renew(BOOL allowed, BOOL closed, BOOL lowPower) {
     allowBattery=allowed;
     if (blocked) return NO;
     if (!externalPower() && (!allowed || hot())) {
@@ -108,24 +115,28 @@ static BOOL renew(BOOL allowed) {
         if (thermal) emergencySleepAt=NSProcessInfo.processInfo.systemUptime+2;
         return NO;
     }
-    NSInteger current=sleepDisabled();
-    if (current<0) { stop(@"Cannot read SleepDisabled; no setting changed"); return NO; }
-    if (active && current!=1) { stop(@"SleepDisabled changed externally; session restored"); return NO; }
-    if (!active && current==0) {
+    if (!closed && !restoreSleep()) { stop(@"Could not restore sleep control"); return NO; }
+    NSInteger current=closed?sleepDisabled():0;
+    if (closed && current<0) { stop(@"Cannot read SleepDisabled; no setting changed"); return NO; }
+    if (closed && active && current!=1) { stop(@"SleepDisabled changed externally; session restored"); return NO; }
+    if (closed && !active && current==0) {
         owned=@{@"original":@0,@"written":@1,@"originalPresent":@(settingPresent),@"containerPresent":@(containerPresent)};
         if (!save() || !setSleepDisabled(1)) { stop(@"Could not enable closed-lid sleep control"); return NO; }
     }
-    active=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
-    reason=current==1 && !owned?@"Existing SleepDisabled setting left unchanged":@"Closed-lid lease active";
+    BOOL batteryLowPower=lowPower && !externalPower();
+    if (!applyLowPowerControl(batteryLowPower)) { stop(@"macOS rejected Low Power Mode, its value changed externally, or restoration failed. Turn automatic Low Power Mode off and retry Restore."); return NO; }
+    active=closed; leaseActive=YES; deadline=NSProcessInfo.processInfo.systemUptime+5;
+    reason=closed?(current==1 && !owned?@"Existing SleepDisabled setting left unchanged":@"Closed-lid lease active"):(batteryLowPower?@"Low Power Mode lease active":@"Battery power lease active");
     return YES;
 }
 static void evaluate(void) {
-    if (!active) return;
+    if (!leaseActive) return;
     if (!fake && owner) {
         uid_t consoleUID=0;
         CFStringRef user=SCDynamicStoreCopyConsoleUser(NULL,&consoleUID,NULL); if (user) CFRelease(user);
         if (consoleUID!=owner.effectiveUserIdentifier) { stop(@"Console user changed"); return; }
     }
+    if (externalPower() && !applyLowPowerControl(NO)) { stop(@"Could not restore Low Power Mode on external power"); return; }
     if (!externalPower() && hot()) {
         stop(@"Battery thermal cutout");
         // Let the hardware guard restore panel/backlight first. If it hangs, prioritize cooling.
@@ -141,7 +152,13 @@ static void powerChanged(void *context) { evaluate(); }
 - (void)renewWithBatteryAllowed:(BOOL)allowed reply:(void (^)(BOOL,NSString *))reply {
     dispatch_async(dispatch_get_main_queue(),^{
         if (owner!=self.connection) { reply(NO,@"Lease connection is no longer current"); return; }
-        reply(renew(allowed),reason);
+        reply(renew(allowed,YES,NO),reason);
+    });
+}
+- (void)renewWithBatteryAllowed:(BOOL)allowed closedLid:(BOOL)closed lowPowerMode:(BOOL)lowPower reply:(void (^)(BOOL,NSString *))reply {
+    dispatch_async(dispatch_get_main_queue(),^{
+        if (owner!=self.connection) { reply(NO,@"Lease connection is no longer current"); return; }
+        reply(renew(allowed,closed,lowPower),reason);
     });
 }
 - (void)releaseWithReply:(void (^)(BOOL,NSString *))reply {
@@ -191,6 +208,7 @@ int main(int argc, char **argv) { @autoreleasepool {
     }
     journal=[folder stringByAppendingPathComponent:@"lid-session.plist"];
     owned=[NSDictionary dictionaryWithContentsOfFile:journal];
+    configureLowPowerControl(folder,fake);
     if (!restore()) { fputs("Pending sleep-setting recovery failed.\n",stderr); return 3; }
     if (fake) {
         puts("READY"); fflush(stdout);
@@ -201,7 +219,7 @@ int main(int argc, char **argv) { @autoreleasepool {
             if (!n) { restore(); exit(0); }
             if (n>0) {
                 NSString *message=[[NSString alloc] initWithBytes:bytes length:n encoding:NSUTF8StringEncoding];
-                BOOL result=[message containsString:@"end"]?restore():renew([message containsString:@"battery=1"]);
+                BOOL result=[message containsString:@"end"]?restore():renew([message containsString:@"battery=1"],![message containsString:@"lid=0"],[message containsString:@"lowpower=1"]);
                 printf("%s %s\n",result?"OK":"NO",reason.UTF8String); fflush(stdout);
             }
         }); dispatch_resume(input);

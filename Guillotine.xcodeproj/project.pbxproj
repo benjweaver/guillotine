@@ -11,10 +11,12 @@
 		0AAD1529CC6537E53FF1B8B5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = D0FBFEB53FF6EDC3666821AE /* main.m */; };
 		0CCB0257E2CC6DD921DE1FB3 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 886F38EF08BBD5CF4562CE57 /* LICENSE */; };
 		0F8B53AAA0DAB71095F7F3E0 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
+		357323ABA6587F867DD82346 /* BatteryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8AE2734B5B46F10EDE6CB4 /* BatteryPolicy.swift */; };
 		3FC440EC5C337487FF145BAB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */; };
 		48212FE3735F7CDC61534F0F /* PhysicalControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B62001C26DA4C06385E6FC35 /* PhysicalControls.swift */; };
 		6B7E6898A7A102BC68461647 /* GuillotineGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7299F62E31542C804255DF5A /* GuillotineGlyph.swift */; };
 		7BF8775E05685152731D5C6C /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = ABAA9F1B4C6F188344B9B2D7 /* main.m */; };
+		83A892CF6028E27B12C404D9 /* LowPowerControl.m in Sources */ = {isa = PBXBuildFile; fileRef = D837631E37AF1A116E422E8A /* LowPowerControl.m */; };
 		906D4FB0C35F6FB058C2E9AB /* Carbon.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB71D6736DFB938115FE4BBF /* Carbon.framework */; };
 		958073D6E826252BCB42B404 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8095FC8E4B7EA1ECF5785866 /* AppKit.framework */; };
 		98251AB63F811D10CFD91ED2 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 488980E09E9EBAE78ED11836 /* IOKit.framework */; };
@@ -61,6 +63,7 @@
 		0EA41138E5959B15C70B8383 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		1AB403A034BE910093CE4540 /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
 		391C5AE463B6BB3A7C3C8CE5 /* GuillotineLidHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = GuillotineLidHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		3F8AE2734B5B46F10EDE6CB4 /* BatteryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryPolicy.swift; sourceTree = "<group>"; };
 		488980E09E9EBAE78ED11836 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		49905AC2D92B0DC6540E6200 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		579F761C84A014C1C14C3D3B /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -69,6 +72,7 @@
 		807B71214F22929565799208 /* GuillotineTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuillotineTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8095FC8E4B7EA1ECF5785866 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		886F38EF08BBD5CF4562CE57 /* LICENSE */ = {isa = PBXFileReference; path = LICENSE; sourceTree = "<group>"; };
+		A75E7E185C89927DFC43AAC4 /* LowPowerControl.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LowPowerControl.h; sourceTree = "<group>"; };
 		ABAA9F1B4C6F188344B9B2D7 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		B62001C26DA4C06385E6FC35 /* PhysicalControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicalControls.swift; sourceTree = "<group>"; };
 		BB71D6736DFB938115FE4BBF /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
@@ -76,6 +80,7 @@
 		BD93A26B7502A992AC7BA832 /* GuillotineGuard */ = {isa = PBXFileReference; includeInIndex = 0; path = GuillotineGuard; sourceTree = BUILT_PRODUCTS_DIR; };
 		C951D2AF91BADCA9FB414EA7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		D0FBFEB53FF6EDC3666821AE /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		D837631E37AF1A116E422E8A /* LowPowerControl.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LowPowerControl.m; sourceTree = "<group>"; };
 		E0C3C432C065AE98283A637F /* ServiceManagement.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ServiceManagement.framework; path = System/Library/Frameworks/ServiceManagement.framework; sourceTree = SDKROOT; };
 		EA03E68B083F6F263E07E436 /* SessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTests.swift; sourceTree = "<group>"; };
 		FAC412360E895079ADA11026 /* SessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionController.swift; sourceTree = "<group>"; };
@@ -128,6 +133,8 @@
 		1E4CD20FA5215AF6FD17E38F /* GuillotineLidHelper */ = {
 			isa = PBXGroup;
 			children = (
+				A75E7E185C89927DFC43AAC4 /* LowPowerControl.h */,
+				D837631E37AF1A116E422E8A /* LowPowerControl.m */,
 				D0FBFEB53FF6EDC3666821AE /* main.m */,
 			);
 			name = GuillotineLidHelper;
@@ -137,6 +144,7 @@
 		225345C0C5AF08C4DCDF40F0 /* Guillotine */ = {
 			isa = PBXGroup;
 			children = (
+				3F8AE2734B5B46F10EDE6CB4 /* BatteryPolicy.swift */,
 				045372880B00E4B6E6F04823 /* GlobalShortcut.swift */,
 				FB1F2C7A714AF40C99BA7AFD /* GuillotineApp.swift */,
 				7299F62E31542C804255DF5A /* GuillotineGlyph.swift */,
@@ -375,6 +383,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				357323ABA6587F867DD82346 /* BatteryPolicy.swift in Sources */,
 				DCAF6A50DF6B5B80DD8F42EA /* GlobalShortcut.swift in Sources */,
 				0401B89310EB49DE7ADD23A4 /* GuillotineApp.swift in Sources */,
 				6B7E6898A7A102BC68461647 /* GuillotineGlyph.swift in Sources */,
@@ -405,6 +414,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				83A892CF6028E27B12C404D9 /* LowPowerControl.m in Sources */,
 				0AAD1529CC6537E53FF1B8B5 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -480,7 +490,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -599,7 +609,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;

@@ -7,6 +7,7 @@ is unchanged. Private APIs require revalidation after macOS updates.
 
 Restore: Control–Option–Command–Space. Fn is optional locally; Vibepollo’s
 inspected input source does not forward it. Lock leaves the mode unchanged.
+When already OFF, the shortcut explicitly requests panel power-on as a rescue.
 Lock-screen/Secure Input hotkey delivery still needs testing. Authentication
 and lock policy remain normal. Sleep/wake restoration is optional.
 
@@ -26,6 +27,21 @@ ORDINARY AND MANUAL SLEEP while active. With this option off, sleep and
 Caffeine settings remain independent. The previous experimental lid-only
 control failed the physical test on this Mac and is no longer used to enable.
 The new control still requires a physical closed-lid test before relying on it.
+
+Battery sleep: enabled at 10% by default, with an editable 1–100% threshold.
+Turn Sleep at a battery percentage off to leave depleted-battery behavior to
+macOS. Only active headless sessions on battery use this cutoff. Controls and
+owned power settings restore before requesting sleep; AC and unknown battery
+readings do not trigger it. A rejected sleep request is reported.
+
+Low Power Mode: Off, Whenever on battery, or At a battery percentage (20%
+preset; editable 1–100%). Requires the approved power helper. Low Power Mode
+can reduce heat while running on battery, which may help avoid thermal limits.
+It may reduce performance. Only the battery profile changes, and its prior
+setting restores on external power, opt-out, session end, or helper lease expiry.
+Battery options apply live. Low Power Mode alone does not block system sleep.
+When upgrading from build 8, Restore, Remove Helper, then Install Helper to
+load the updated protocol; macOS may ask you to approve it again.
 
 Battery use is optional, off by default. Unplugging restores unless Allow on
 battery is enabled; turning it off on battery restores immediately. Replugging

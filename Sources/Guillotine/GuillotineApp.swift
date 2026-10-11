@@ -28,7 +28,12 @@ import AppKit
     private var observations: [NSObjectProtocol] = []
     private lazy var preferences = PreferencesModel()
     private lazy var shortcut = GlobalShortcut { [weak self] in
-        self?.session.disable(reason: "Physical controls turned off with the global shortcut.")
+        guard let self else { return }
+        if self.session.enabled { self.session.disable(reason: "Physical controls turned off with the global shortcut.") }
+        else {
+            do { try self.controls.emergencyRestore(); self.session.reportRestoration("Built-in panel power-on requested with the global shortcut.") }
+            catch { self.session.reportError(error.localizedDescription) }
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -47,6 +52,13 @@ import AppKit
         }
         controls.muteSpeakers = preferences.muteSpeakers
         preferences.speakerPolicyChanged = { [weak self] muted in self?.controls.muteSpeakers = muted }
+        controls.sleepBatteryPercentage = preferences.sleepThreshold
+        controls.lowPowerBatteryPercentage = preferences.lowPowerThreshold
+        preferences.energyPolicyChanged = { [weak self] in
+            guard let self else { return }
+            self.controls.sleepBatteryPercentage = self.preferences.sleepThreshold
+            self.controls.lowPowerBatteryPercentage = self.preferences.lowPowerThreshold
+        }
         session.refreshPower()
         preferences.applyShortcut = { [weak self] candidate in
             guard let self else { return }
@@ -101,6 +113,10 @@ import AppKit
         add(DisplayStatus.summary, to: menu)
         add(preferences.closedLid ? (preferences.lidHelperReady ? "Closed lid: helper ready • global sleep block" : "Closed lid: helper approval needed") : "Closed lid: normal macOS policy", to: menu)
         add(preferences.allowBattery ? "Battery allowed • thermal cutout active" : "Battery disabled • unplug restores", to: menu)
+        if preferences.allowBattery {
+            add(preferences.batterySleepEnabled ? "Battery sleep: \(preferences.batterySleepPercentage)%" : "Battery sleep: off", to: menu)
+            add("Low Power Mode: \(preferences.lowPowerPolicy == .belowPercentage ? "at \(preferences.lowPowerPercentage)%" : preferences.lowPowerPolicy.label)", to: menu)
+        }
         if let error = session.error {
             let item = NSMenuItem()
             item.view = NSHostingView(rootView: Text(error).font(.caption).foregroundStyle(.red).frame(width: 290, alignment: .leading).padding(10))
@@ -135,9 +151,9 @@ import AppKit
     @objc private func toggleSpeakers() { preferences.muteSpeakers.toggle() }
     @objc private func toggleMode() {
         if session.enabled { session.disable() } else {
-            if preferences.closedLid && !preferences.lidHelperReady {
+            if (preferences.closedLid || preferences.lowPowerPolicy != .off) && !preferences.lidHelperReady {
                 preferences.refreshLidHelper()
-                session.reportError("Closed-lid operation needs the approved helper. Install Helper in Settings, then approve Guillotine in macOS Login Items. Lid-open controls work with this option off.")
+                session.reportError("Closed-lid operation and automatic Low Power Mode need the approved power helper. Install Helper in Settings, then approve Guillotine in macOS Login Items. Both options can be turned off to use the physical controls alone.")
                 showSettings(); return
             }
             controls.allowBattery = preferences.allowBattery

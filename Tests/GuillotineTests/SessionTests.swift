@@ -165,6 +165,46 @@ import Carbon
         next.refreshPower()
         XCTAssertFalse(next.enabled)
     }
+    func testBatteryPolicyDefaultsAndBounds() {
+        XCTAssertEqual(BatteryPolicy.defaultSleepPercentage, 10)
+        XCTAssertEqual(BatteryPolicy.defaultLowPowerPercentage, 20)
+        XCTAssertEqual(BatteryPolicy.percentage(-5), 1)
+        XCTAssertEqual(BatteryPolicy.percentage(0), 1)
+        XCTAssertEqual(BatteryPolicy.percentage(37), 37)
+        XCTAssertEqual(BatteryPolicy.percentage(101), 100)
+    }
+    func testEnergyPreferenceEditingAndPersistenceDoesNotRecurse() throws {
+        let name = "Guillotine.EnergyTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let preferences = PreferencesModel(defaults: defaults)
+        XCTAssertTrue(preferences.batterySleepEnabled)
+        XCTAssertEqual(preferences.sleepThreshold, 10)
+        XCTAssertEqual(preferences.lowPowerThreshold, 0)
+        var changes = 0
+        preferences.energyPolicyChanged = { changes += 1 }
+        preferences.batterySleepPercentage = 37
+        preferences.lowPowerPercentage = 42
+        preferences.lowPowerPolicy = .belowPercentage
+        XCTAssertEqual(preferences.sleepThreshold, 37)
+        XCTAssertEqual(preferences.lowPowerThreshold, 42)
+        preferences.batterySleepPercentage = -5
+        preferences.lowPowerPercentage = 500
+        XCTAssertEqual(preferences.batterySleepPercentage, 1)
+        XCTAssertEqual(preferences.lowPowerPercentage, 100)
+        preferences.batterySleepEnabled = false
+        XCTAssertEqual(preferences.sleepThreshold, 0)
+        preferences.lowPowerPolicy = .onBattery
+        XCTAssertEqual(preferences.lowPowerThreshold, 100)
+        preferences.lowPowerPolicy = .off
+        XCTAssertEqual(preferences.lowPowerThreshold, 0)
+        XCTAssertGreaterThan(changes, 0)
+        let reloaded = PreferencesModel(defaults: defaults)
+        XCTAssertFalse(reloaded.batterySleepEnabled)
+        XCTAssertEqual(reloaded.batterySleepPercentage, 1)
+        XCTAssertEqual(reloaded.lowPowerPercentage, 100)
+        XCTAssertEqual(reloaded.lowPowerPolicy, .off)
+    }
     func testShortcutValidationAndPersistence() {
         XCTAssertTrue(Shortcut.standard.valid)
         XCTAssertEqual(Shortcut.standard.key, UInt32(kVK_Space))

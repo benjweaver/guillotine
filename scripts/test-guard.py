@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Guard lifecycle tests use fake hardware only. Pass the built Guard executable."""
+import plistlib
 import pathlib
 import subprocess
 import sys
@@ -117,6 +118,101 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.mute(), '1')
         child.stdin.close(); self.restored(child)
         self.assertEqual(self.mute(), '0')
+    def percentage(self, value):
+        (self.folder / 'test-percentage').write_text(str(value))
+    def test_default_battery_cutoff_is_inclusive(self):
+        self.percentage(11)
+        (self.folder / 'test-power').write_text('battery')
+        self.set_mute(0)
+        child = self.start('--allow-battery', '--closed-lid', '--mute-speakers'); self.ready(child)
+        self.percentage(10)
+        self.restored(child)
+        self.assertEqual(self.mute(), '0')
+        self.assertTrue((self.folder / 'test-sleep-request').exists())
+        policy = plistlib.loads((self.folder / 'test-helper-policy.plist').read_bytes())
+        self.assertTrue(policy['released'])
+    def test_custom_sleep_percentage(self):
+        self.percentage(38)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery', '--sleep-below', '37'); self.ready(child)
+        self.percentage(37)
+        self.restored(child)
+        self.assertTrue((self.folder / 'test-sleep-request').exists())
+    def test_sleep_cutoff_can_be_disabled(self):
+        self.percentage(1)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery', '--sleep-below', '0'); self.ready(child)
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        child.stdin.close(); self.restored(child)
+        self.assertFalse((self.folder / 'test-sleep-request').exists())
+    def test_cutoff_does_not_apply_on_external_power(self):
+        self.percentage(1)
+        child = self.start(); self.ready(child)
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        child.stdin.close(); self.restored(child)
+        self.assertFalse((self.folder / 'test-sleep-request').exists())
+    def test_unknown_and_invalid_percentages_do_not_request_sleep(self):
+        for value in ('missing', '-1', '101', 'nan', 'bad'):
+            with self.subTest(value=value):
+                self.percentage(value)
+                (self.folder / 'test-power').write_text('battery')
+                child = self.start('--allow-battery'); self.ready(child)
+                time.sleep(.05); self.assertIsNone(child.poll())
+                child.stdin.close(); self.restored(child)
+                self.assertFalse((self.folder / 'test-sleep-request').exists())
+    def test_fractional_percentage_does_not_sleep_early(self):
+        self.percentage('10.5')
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery'); self.ready(child)
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        child.stdin.close(); self.restored(child)
+    def test_live_sleep_policy_requests_cutoff(self):
+        self.percentage(40)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery'); self.ready(child)
+        child.stdin.write(b'renew sleep=40\n'); child.stdin.flush()
+        self.restored(child)
+        self.assertTrue((self.folder / 'test-sleep-request').exists())
+    def test_live_sleep_disable_prevents_cutoff(self):
+        self.percentage(11)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery'); self.ready(child)
+        child.stdin.write(b'renew sleep=0\n'); child.stdin.flush()
+        time.sleep(.05); self.percentage(1)
+        time.sleep(1.2); self.assertIsNone(child.poll())
+        child.stdin.close(); self.restored(child)
+        self.assertFalse((self.folder / 'test-sleep-request').exists())
+    def test_invalid_policy_percentages_are_rejected(self):
+        for option in ('--sleep-below', '--low-power-below'):
+            child = self.start(option, '101')
+            self.assertTrue(child.stdout.readline().startswith(b'ERROR Battery percentages'))
+            self.assertEqual(child.wait(timeout=2), 2)
+    def helper_policy(self):
+        return plistlib.loads((self.folder / 'test-helper-policy.plist').read_bytes())
+    def wait_low_power(self, expected):
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            if self.helper_policy()['lowPowerMode'] == expected:
+                return
+            time.sleep(.02)
+        self.fail('Low Power Mode threshold did not apply')
+    def test_low_power_threshold_and_external_power_restore(self):
+        self.percentage(21)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery', '--low-power-below', '20'); self.ready(child)
+        self.assertFalse(self.helper_policy()['lowPowerMode'])
+        self.assertFalse(self.helper_policy()['closedLid'])
+        self.percentage(20); self.wait_low_power(True)
+        (self.folder / 'test-power').write_text('ac'); self.wait_low_power(False)
+        child.stdin.close(); self.restored(child)
+    def test_low_power_whenever_battery_and_live_opt_out(self):
+        self.percentage(99)
+        (self.folder / 'test-power').write_text('battery')
+        child = self.start('--allow-battery', '--low-power-below', '100'); self.ready(child)
+        self.assertTrue(self.helper_policy()['lowPowerMode'])
+        child.stdin.write(b'renew lowpower=0\n'); child.stdin.flush()
+        self.wait_low_power(False)
+        child.stdin.close(); self.restored(child)
     def test_battery_requires_opt_in(self):
         (self.folder / 'test-power').write_text('battery')
         child = self.start()
@@ -178,6 +274,16 @@ class GuardTests(unittest.TestCase):
         recovered = self.start('--recover')
         self.assertEqual(recovered.stdout.readline().strip(), b'RECOVERED')
         self.restored(recovered)
+    def test_explicit_restore_powers_panel_on_without_a_journal(self):
+        child = self.start('--restore')
+        self.assertEqual(child.stdout.readline().strip(), b'RECOVERED')
+        self.restored(child)
+        self.assertTrue((self.folder / 'test-panel-on').exists())
+    def test_startup_recovery_does_not_power_an_unowned_panel(self):
+        child = self.start('--recover')
+        self.assertEqual(child.stdout.readline().strip(), b'RECOVERED')
+        self.restored(child)
+        self.assertFalse((self.folder / 'test-panel-on').exists())
     def test_remote_restore_command(self):
         first = self.start(); self.ready(first)
         request = self.start('--restore')

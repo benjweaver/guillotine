@@ -10,6 +10,8 @@ import Darwin
     var allowBattery = false
     var closedLid = false
     var muteSpeakers = false
+    var sleepBatteryPercentage = 10
+    var lowPowerBatteryPercentage = 0
     var restoreOnSleep = false
     var restoreOnWake = false
     var onStopped: ((String) -> Void)?
@@ -21,10 +23,12 @@ import Darwin
     private var executable: URL {
         Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/GuillotineGuard")
     }
-    func recover() throws {
+    func emergencyRestore() throws { try runRecovery(argument: "--restore") }
+    func recover() throws { try runRecovery(argument: "--recover") }
+    private func runRecovery(argument: String) throws {
         let child = Process()
         child.executableURL = executable
-        child.arguments = ["--recover"]
+        child.arguments = [argument]
         child.standardOutput = FileHandle.nullDevice
         child.standardError = FileHandle.nullDevice
         try child.run()
@@ -37,7 +41,7 @@ import Darwin
         signal(SIGPIPE, SIG_IGN)
         let child = Process(), input = Pipe(), output = Pipe()
         child.executableURL = executable
-        child.arguments = (muteSpeakers ? ["--mute-speakers"] : []) + (allowBattery ? ["--allow-battery"] : []) + (closedLid ? ["--closed-lid"] : []) + (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
+        child.arguments = ["--sleep-below", String(sleepBatteryPercentage), "--low-power-below", String(lowPowerBatteryPercentage)] + (muteSpeakers ? ["--mute-speakers"] : []) + (allowBattery ? ["--allow-battery"] : []) + (closedLid ? ["--closed-lid"] : []) + (restoreOnSleep ? ["--restore-on-sleep"] : []) + (restoreOnWake ? ["--restore-on-wake"] : [])
         child.standardInput = input; child.standardOutput = output
         child.standardError = FileHandle.nullDevice
         try child.run()
@@ -62,7 +66,7 @@ import Darwin
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                do { try self.lease?.write(contentsOf: Data("renew battery=\(self.allowBattery ? 1 : 0) mute=\(self.muteSpeakers ? 1 : 0)\n".utf8)) }
+                do { try self.lease?.write(contentsOf: Data("renew battery=\(self.allowBattery ? 1 : 0) mute=\(self.muteSpeakers ? 1 : 0) sleep=\(self.sleepBatteryPercentage) lowpower=\(self.lowPowerBatteryPercentage)\n".utf8)) }
                 catch { self.onStopped?(self.stopReason) }
             }
         }

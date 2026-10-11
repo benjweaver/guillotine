@@ -86,6 +86,13 @@ enum PowerState: String, Equatable {
         }
     }
 
+    func reportRestoration(_ text: String) {
+        guard !enabled else { return }
+        error = nil
+        message = text
+        onChange?()
+    }
+
     func reportError(_ text: String) { fail(text) }
 
     private func fail(_ description: String) {

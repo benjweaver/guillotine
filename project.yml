@@ -15,7 +15,7 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_APP_SANDBOX: NO
     MARKETING_VERSION: '1.0.0'
-    CURRENT_PROJECT_VERSION: '8'
+    CURRENT_PROJECT_VERSION: '9'
 targets:
   Guillotine:
     type: application

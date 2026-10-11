@@ -5,5 +5,6 @@
 #define GUILLOTINE_HELPER_REQUIREMENT @"anchor apple generic and identifier \"GuillotineLidHelper\" and certificate leaf[subject.OU] = \"AR25V66TVY\""
 @protocol GuillotineLidService
 - (void)renewWithBatteryAllowed:(BOOL)allowed reply:(void (^)(BOOL, NSString *))reply;
+- (void)renewWithBatteryAllowed:(BOOL)allowed closedLid:(BOOL)closed lowPowerMode:(BOOL)lowPower reply:(void (^)(BOOL, NSString *))reply;
 - (void)releaseWithReply:(void (^)(BOOL, NSString *))reply;
 @end

@@ -32,6 +32,7 @@ static BOOL fake, finished, ready, restoreSleep, restoreWake, sleepPending;
 static NSTimeInterval deadline;
 static int lockFD;
 static BOOL allowBattery, closedLid, muteSpeakers;
+static NSInteger sleepBelow=10, lowPowerBelow;
 static io_connect_t powerConnection;
 static NSString *directory;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
@@ -126,6 +127,34 @@ static BOOL externalPower(void) {
     CFStringRef type=IOPSGetProvidingPowerSourceType(info);
     BOOL ac=type && CFEqual(type,CFSTR(kIOPSACPowerValue)); CFRelease(info); return ac;
 }
+static double batteryPercentage(void) {
+    if (fake) {
+        NSString *value=[NSString stringWithContentsOfFile:[directory stringByAppendingPathComponent:@"test-percentage"] encoding:NSUTF8StringEncoding error:nil];
+        if (!value) return -1;
+        NSScanner *scanner=[NSScanner scannerWithString:value]; double number=0;
+        return [scanner scanDouble:&number] && scanner.isAtEnd && isfinite(number) && number>=0 && number<=100?number:-1;
+    }
+    CFTypeRef info=IOPSCopyPowerSourcesInfo(); if (!info) return -1;
+    NSArray *sources=CFBridgingRelease(IOPSCopyPowerSourcesList(info));
+    double percentage=-1;
+    for (id source in sources) {
+        NSDictionary *description=(__bridge NSDictionary *)IOPSGetPowerSourceDescription(info,(__bridge CFTypeRef)source);
+        if (![description[@kIOPSTypeKey] isEqual:@kIOPSInternalBatteryType]) continue;
+        NSNumber *current=description[@kIOPSCurrentCapacityKey], *maximum=description[@kIOPSMaxCapacityKey];
+        if (![current isKindOfClass:NSNumber.class] || ![maximum isKindOfClass:NSNumber.class]) continue;
+        double c=current.doubleValue, m=maximum.doubleValue;
+        if (isfinite(c) && isfinite(m) && m>0 && c>=0 && c<=m) percentage=100*c/m;
+        break;
+    }
+    CFRelease(info); return percentage;
+}
+static NSInteger percentageOption(NSArray *args, NSString *flag, NSInteger fallback) {
+    NSUInteger index=[args indexOfObject:flag];
+    if (index==NSNotFound) return fallback;
+    if (index+1>=args.count) return -1;
+    NSScanner *scanner=[NSScanner scannerWithString:args[index+1]]; NSInteger number=0;
+    return [scanner scanInteger:&number] && scanner.isAtEnd && number>=0 && number<=100?number:-1;
+}
 static BOOL tooHot(void) {
     if (fake) return [[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-hot"]];
     return NSProcessInfo.processInfo.thermalState>=NSProcessInfoThermalStateSerious;
@@ -138,7 +167,9 @@ static IOReturn lidControl(BOOL disable) {
 }
 static NSXPCConnection *lidConnection;
 static BOOL lidServiceCall(BOOL releasing, NSString **error) {
-    if (fake) return YES;
+    double percentage=batteryPercentage();
+    BOOL lowPower=lowPowerBelow>0 && !externalPower() && percentage>=0 && percentage<=lowPowerBelow;
+    if (fake) return [@{@"released":@(releasing),@"closedLid":@(closedLid),@"lowPowerMode":@(lowPower)} writeToFile:[directory stringByAppendingPathComponent:@"test-helper-policy.plist"] atomically:YES];
     if (!lidConnection) {
         lidConnection=[[NSXPCConnection alloc] initWithMachServiceName:GUILLOTINE_LID_SERVICE options:NSXPCConnectionPrivileged];
         lidConnection.remoteObjectInterface=[NSXPCInterface interfaceWithProtocol:@protocol(GuillotineLidService)];
@@ -148,10 +179,12 @@ static BOOL lidServiceCall(BOOL releasing, NSString **error) {
     dispatch_semaphore_t done=dispatch_semaphore_create(0);
     __block BOOL ok=NO;
     __block NSString *failure=@"Closed-lid helper unavailable. Install and approve it in Settings.";
-    id<GuillotineLidService> proxy=[lidConnection remoteObjectProxyWithErrorHandler:^(NSError *e){ failure=e.localizedDescription; dispatch_semaphore_signal(done); }];
+    id<GuillotineLidService> proxy=[lidConnection remoteObjectProxyWithErrorHandler:^(NSError *e){ failure=[@"Power helper unavailable or out of date. In Settings, Remove Helper, then Install Helper and approve it again. " stringByAppendingString:e.localizedDescription]; dispatch_semaphore_signal(done); }];
     void (^reply)(BOOL,NSString *)=^(BOOL success,NSString *message){ ok=success; failure=message; dispatch_semaphore_signal(done); };
     if (releasing) [proxy releaseWithReply:reply];
-    else [proxy renewWithBatteryAllowed:allowBattery reply:reply];
+    else if (lowPowerBelow>0 || !closedLid) {
+        [proxy renewWithBatteryAllowed:allowBattery closedLid:closedLid lowPowerMode:lowPower reply:reply];
+    } else [proxy renewWithBatteryAllowed:allowBattery reply:reply];
     if (dispatch_semaphore_wait(done,dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC))) ok=NO;
     if (releasing || !ok) { [lidConnection invalidate]; lidConnection=nil; }
     if (!ok && error) *error=failure;
@@ -180,31 +213,34 @@ static void finish(int code, NSString *reason) {
     emit([NSString stringWithFormat:@"STOP %@%@",reason,restored?@"":@"; restoration failed; reopen Guillotine to retry"]);
     exit(restored?code:3);
 }
-static void thermalCutout(void) {
+static void sleepCutout(NSString *cause) {
     if (finished) return; finished=YES;
     BOOL restored=restore();
-    [@"Thermal cutout: controls restored; system sleep requested." writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [[cause stringByAppendingString:@": controls restored; system sleep requested."] writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
     if (fake) {
         [@"sleep" writeToFile:[directory stringByAppendingPathComponent:@"test-sleep-request"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        emit(@"STOP Thermal cutout: restored before sleep request"); exit(restored?0:3);
+        emit([NSString stringWithFormat:@"STOP %@: restored before sleep request",cause]); exit(restored?0:3);
     }
     if (!powerConnection) powerConnection=IOPMFindPowerManagement(MACH_PORT_NULL);
     IOReturn result=IOPMSleepSystem(powerConnection);
-    NSString *outcome=[NSString stringWithFormat:@"Thermal cutout: restoration %@; sleep request %@ (0x%x).",restored?@"succeeded":@"failed",result==KERN_SUCCESS?@"accepted":@"rejected",result];
+    NSString *outcome=[NSString stringWithFormat:@"%@: restoration %@; sleep request %@ (0x%x).",cause,restored?@"succeeded":@"failed",result==KERN_SUCCESS?@"accepted":@"rejected",result];
     [outcome writeToFile:[directory stringByAppendingPathComponent:@"last-stop.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
     emit([@"STOP " stringByAppendingString:outcome]);
     exit(restored && result==KERN_SUCCESS?0:3);
 }
 static void enforcePolicy(void) {
     if (externalPower()) return;
-    if (tooHot()) thermalCutout();
+    if (tooHot()) sleepCutout(@"Thermal cutout");
     if (!allowBattery) finish(0,@"External power disconnected; battery use is disabled");
+    double percentage=batteryPercentage();
+    if (sleepBelow>0 && percentage>=0 && percentage<=sleepBelow)
+        sleepCutout([NSString stringWithFormat:@"Battery cutoff (%.0f%%, threshold %ld%%)",percentage,(long)sleepBelow]);
 }
 static void powerChanged(void *context) { if (ready) enforcePolicy(); }
 static BOOL applyOff(NSString **error) {
     enforcePolicy();
     if (!applyAudio(error)) return NO;
-    if (closedLid) {
+    if (closedLid || lowPowerBelow>0 || [saved[@"lidService"] boolValue]) {
         saved[@"lidService"]=@YES;
         if (!saveJournal() || !lidServiceCall(NO,error)) {
             if (!*error) *error=@"Could not journal closed-lid helper ownership.";
@@ -263,6 +299,9 @@ int main(int argc, char **argv) { @autoreleasepool {
     allowBattery=[args containsObject:@"--allow-battery"];
     closedLid=[args containsObject:@"--closed-lid"];
     muteSpeakers=[args containsObject:@"--mute-speakers"];
+    sleepBelow=percentageOption(args,@"--sleep-below",10);
+    lowPowerBelow=percentageOption(args,@"--low-power-below",0);
+    if (sleepBelow<0 || lowPowerBelow<0) { emit(@"ERROR Battery percentages must be 0 (off) through 100."); return 2; }
     restoreSleep=[args containsObject:@"--restore-on-sleep"];
     restoreWake=[args containsObject:@"--restore-on-wake"];
     directory=fake?args.lastObject:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Guillotine"];
@@ -282,7 +321,15 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!loadHardware(&error)) { emit([@"ERROR " stringByAppendingString:error]); return 2; }
     saved=[[NSDictionary dictionaryWithContentsOfFile:journal] mutableCopy];
     if (saved && !restore()) { emit(@"ERROR Previous hardware session could not be restored. Restart macOS or retry."); return 3; }
-    if ([args containsObject:@"--recover"] || [args containsObject:@"--restore"]) { emit(@"RECOVERED"); return 0; }
+    if ([args containsObject:@"--recover"] || [args containsObject:@"--restore"]) {
+        // Explicit rescue may power the panel on even with no remaining ownership
+        // journal. Ordinary startup recovery never wakes an unowned display.
+        if ([args containsObject:@"--restore"]) {
+            BOOL restored=fake?[@"on" writeToFile:[directory stringByAppendingPathComponent:@"test-panel-on"] atomically:YES encoding:NSUTF8StringEncoding error:nil]:setPanel(panel,1)==KERN_SUCCESS;
+            if (!restored) { emit(@"ERROR Could not power the built-in panel on."); return 3; }
+        }
+        emit(@"RECOVERED"); return 0;
+    }
     if (!externalPower() && (!allowBattery || tooHot())) { emit(@"ERROR Battery use is disabled or macOS thermal pressure is too high. Connect power or wait for cooling."); return 2; }
     NSMutableDictionary *values=[NSMutableDictionary dictionary];
     NSArray *ids=fake?@[@1]:[keyboard copyKeyboardBacklightIDs];
@@ -322,6 +369,13 @@ int main(int argc, char **argv) { @autoreleasepool {
                 else if ([message containsString:@"battery=1"]) allowBattery=YES;
                 if ([message containsString:@"mute=0"]) muteSpeakers=NO;
                 else if ([message containsString:@"mute=1"]) muteSpeakers=YES;
+                for (NSString *token in [message componentsSeparatedByString:@" "]) {
+                    BOOL sleepToken=[token hasPrefix:@"sleep="], lowToken=[token hasPrefix:@"lowpower="];
+                    if (!sleepToken && !lowToken) continue;
+                    NSInteger value=percentageOption(@[@"value",[[token componentsSeparatedByString:@"="] lastObject]],@"value",-1);
+                    if (value<0) finish(2,@"Invalid battery percentage policy");
+                    if (sleepToken) sleepBelow=value; else lowPowerBelow=value;
+                }
                 deadline=NSProcessInfo.processInfo.systemUptime+5;
                 enforcePolicy();
                 NSString *audioError=nil;

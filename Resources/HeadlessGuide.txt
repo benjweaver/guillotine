@@ -1,55 +1,28 @@
 GUILLOTINE — OFF WITH THE HEAD
 
-Headless Mode prevents idle SYSTEM sleep on external power. It allows the
-physical display to sleep and the keyboard backlight to time out normally.
-It does not set brightness to zero or generate fake input.
+Cut Screen & Keyboard switches off the built-in Apple Silicon panel and
+keyboard backlight while leaving the logical display connected.
 
-LID OPEN / DESKTOP MAC
-Connect external power, enable Headless Mode, and let the display idle-sleep.
-Configure Remote Login or Screen Sharing yourself in System Settings > General
-> Sharing. Guillotine never changes sharing, lock-screen, or network settings.
-Charging paused / full battery still counts as external power.
+Sleep is independent. Guillotine never prevents sleep or changes sleep
+settings. Caffeine and streaming hosts can continue running their own policy.
+Leave the lid open or establish native clamshell operation separately.
 
-LID CLOSED
-The idle-sleep assertion DOES NOT override lid-close sleep. Software-only,
-lid-closed operation without an external display is unsupported in this build.
-Use macOS closed-display mode: external power, an external display, and an
-external keyboard and mouse/trackpad. Approve accessories on Apple Silicon
-before closing the lid. Test remote access before leaving the Mac unattended.
+Restore: Control–Option–Command–Space. Fn is optional in Settings; the local
+Vibepollo input source does not currently forward Fn. Lock-screen and Secure
+Input hotkey delivery must be tested; there is no authentication bypass.
+Lock leaves the mode unchanged. Stay headless across sleep and wake is the
+default; optional restore-on-sleep and restore-on-wake are in Settings.
 
-A compatible HDMI/USB-C EDID display-emulator (dummy plug) may satisfy the
-display requirement without a physical monitor. This is hardware/OS dependent;
-it is not guaranteed or verified by Guillotine. A virtual display gives capture
-software a graphical surface but does NOT by itself prove lid-close support.
-"Display detected" includes virtual displays; it is not a clamshell guarantee.
+The APIs are PRIVATE and experimental. The panel uses a power request, never
+screen brightness zero. Keyboard brightness zero is checked, and its original
+value is journaled for restoration. Keyboard auto-brightness is not changed.
+No virtual display is created or altered. Real capture compatibility still
+requires a progressing-frame/input test on the exact streaming stack.
 
-Some tools use root's persistent `pmset disablesleep` setting. Guillotine does
-not install that override: it changes system-wide sleep semantics, and there
-is no public process-scoped, lid-close-only equivalent. No helper, SIP change,
-sudoers rule, or persistent power setting is needed or installed.
+External-power loss, app quit/crash or a five-second lease expiry restores
+physical controls through a bundled nonprivileged guard. If the guard itself
+is killed, reopen Guillotine to recover its journal. If recovery fails,
+restart macOS. There is no root service or SIP change.
 
-STREAMING IS SEPARATE FROM STAYING AWAKE
-SSH needs an awake computer and network, not a display. Screen Sharing can
-provide a virtual desktop in supported High Performance sessions (Apple
-Silicon, macOS 14+). Sunshine has experimental native macOS support and needs
-a capturable display, Screen Recording permission and any input permissions
-its version requests. Select a tested virtual display or dummy plug if the
-physical display disappears or capture freezes when it sleeps/closes.
-Moonlight is the client. Guillotine does not run or configure either application.
-Vibepollo varies by fork/version: do not assume its Windows/Linux virtual
-display functionality works on macOS; verify the exact macOS release first.
-
-RESTORATION
-Disable, Quit, power loss or power-read failure releases Guillotine's assertion.
-Reconnecting power never enables it. Every launch starts disabled, including
-launch at login. macOS automatically releases the assertion after an app crash.
-Disabling does not force sleep or disconnect sessions. macOS resumes policy.
-
-The global disable shortcut defaults to Fn-Control-Option-Command-Space. Change it
-in Settings. Secure Input or the lock screen can block global hotkeys; do not
-depend on it at the lock screen. No Accessibility permission is needed by
-Guillotine. Backlight timeout is controlled in System Settings; Guillotine has no
-supported API to force the keyboard light off.
-
-See the repository README, docs/PLATFORM.md and docs/TESTING.md for sources,
-compatibility details and the physical hardware acceptance checklist.
+Supported: Apple Silicon MacBook, macOS 13+. Intel/desktop/external panel power
+control is unavailable. Launch always starts restored. Login remains normal.

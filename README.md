@@ -1,68 +1,60 @@
 # Guillotine
 
-**Off with the head.** A small native menu bar app for headless remote access on external power. A blade suspended over a display turns the name into a visual pun: keep the computer awake while its physical screen sleeps. The icons are original vector artwork.
+**Off with the head.** A native menu bar switch that cuts the MacBook's physical panel power and keyboard backlight while leaving its logical display connected for remote access.
 
-Guillotine prevents **idle system sleep**, while allowing real display sleep and normal keyboard backlight timeout. It starts disabled, turns off on external-power loss, and never re-enables on reconnect. macOS 13 Ventura or later; Apple Silicon first, universal Intel build supported.
+Guillotine does **not** prevent sleep, sleep the computer, alter display timeouts, dim the screen to zero, or configure Caffeine. macOS sleep settings and other apps remain independent. If you want an awake remote host, configure those separately. This is the revised physical-control implementation; earlier commits implemented idle-sleep prevention.
 
-**Closed-lid limitation:** the assertion does not prevent lid-close sleep. Use macOS closed-display mode with external power, display, keyboard and mouse/trackpad. A compatible EDID dummy plug may replace the monitor, but must be tested on your Mac. Software-only closed-lid operation without a display is **unsupported**. No privileged helper or persistent power override is installed. See [platform investigation](docs/PLATFORM.md).
+## Supported setup
 
-## Build and run
+Apple Silicon MacBooks, macOS 13 or later. Verified hardware: MacBookPro18,1 running macOS 27.0.1. The built-in panel uses the private `IOMobileFramebufferRequestPowerChange` API; the keyboard uses private CoreBrightness APIs. These are experimental and can stop working after macOS updates. Activation fails with an error if either control is unavailable. Intel and desktop/external panel control are not implemented; the universal executable reports that limitation.
 
-Open `Guillotine.xcodeproj`, select the **Guillotine** scheme and **My Mac**, then Run. The complete project and shared scheme are checked in; XcodeGen is not required. Xcode 16+ with the macOS SDK is recommended. The verified build environment is recorded in [TESTING.md](docs/TESTING.md).
+No brightness-to-zero substitute is used for the screen. The keyboard's backlight brightness is set to zero and checked. The panel's logical framebuffer remains active; no display configuration, mirroring, virtual display, network interface, streaming process or authentication setting is changed. No fake monitor is created. This does not override lid-close behavior: leave the lid open or establish a supported macOS clamshell setup separately.
 
-Command-line local build (no signing team required):
+## Use
+
+1. Connect external power. Full battery and optimized charging count as plugged in.
+2. Click the guillotine menu icon → **Cut Screen & Keyboard**, or use Settings. Both physical controls switch off immediately; the icon fills while the guard owns them.
+3. Restore with **Control–Option–Command–Space**, the menu, or Quit. Fn is optional in Settings. The local Vibepollo input source forwards Control/Option/Command but has no Fn mapping, so the default omits Fn for remote use.
+4. Lock does not change the mode. It also stays active through system sleep/wake by default. Optional restore-on-sleep and restore-on-wake settings apply on the next activation. Normal sleep still suspends streaming; Guillotine does not keep the Mac awake.
+5. External-power loss, app exit/crash, or a stopped heartbeat restores physical controls. Reconnecting power does not reactivate. Launch and login always start restored.
+
+The shortcut is registered exclusively so macOS reports registered conflicts. **Lock-screen and Secure Input delivery are not certified**; remote input reaching loginwindow is not proof a user-session Carbon hotkey is delivered. A remote client must forward the selected keys. The UI remains authenticated and no lock-screen bypass is installed. See the manual acceptance tests before relying on lock-screen recovery. A same-user SSH recovery command works independently of keyboard routing and leaves the Mac locked:
+
+```sh
+/Applications/Guillotine.app/Contents/Helpers/GuillotineGuard --restore
+```
+
+System transitions can briefly wake the panel/backlight before the guard reapplies the request on its next one-second tick. Settings report ownership, not an electrical power measurement.
+
+## Restoration and guard
+
+`Guillotine.app/Contents/Helpers/GuillotineGuard` is a bundled, signed, **nonprivileged** user process. No root service, installer, SIP change or background daemon is required. The app renews a five-second lease over an anonymous pipe. Pipe EOF, lease expiry, SIGTERM, or independent IOKit AC notifications trigger restoration. Sleep/wake notifications grant a bounded eight-second grace for the parent to renew; the lease is never made indefinite. The default never restores merely because the screen locks.
+
+Before a hardware write, the guard atomically writes and fsyncs `~/Library/Application Support/Guillotine/hardware-session.plist`. An exclusive file lock prevents two guards owning the same hardware. An app restart recovers a killed guard's journal before activation. A killed guard itself cannot execute cleanup: app recovery or the next launch retries restoration. If APIs become unavailable, restart macOS and report the error.
+
+The guard never changes keyboard auto-brightness. While active it keeps the backlight at zero; if the user/OS raises it, it records that new value before reapplying zero. Restoration leaves a nonzero current value alone, otherwise restores the most recently recorded value. Panel restoration sends power-on only for the session's owned power-off request; no public per-client ownership token exists for this private API. Normal macOS power behavior resumes when the guard ends.
+
+Remove by restoring, disabling launch at login, quitting and deleting the app. There is no privileged helper to uninstall. Keep a pending recovery journal until restoration has succeeded.
+
+## Build, signing and tests
+
+Open `Guillotine.xcodeproj` and run the **Guillotine** scheme on My Mac. The complete shared project is included; XcodeGen is optional. Xcode 16+ is recommended; verified with Xcode 27 beta.
 
 ```sh
 xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
   -configuration Release -derivedDataPath build \
-  CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES \
-  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
+  CODE_SIGN_IDENTITY=- ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
 open build/Build/Products/Release/Guillotine.app
 ```
 
-For distribution, select your Developer ID team, sign, archive and notarize with your own Apple credentials. The supplied local binary is signed with Ben Weaver’s Developer ID Application certificate and hardened runtime, but is not notarized. Do not weaken Gatekeeper or SIP. Run your local Xcode build if downloaded binaries are blocked.
-
-## Use
-
-1. Connect external power. Full battery or optimized charging still qualifies. Desktop AC qualifies; a UPS running on battery does not.
-2. Click the outlined guillotine in the menu bar → **Enable Headless Mode**. The blade fills and a power dot appears when active. Let the display sleep normally.
-3. Disable from the menu or press **Fn–Control–Option–Command–Space** while another app has focus. Settings lets you choose modifiers and a key; a conflicting shortcut leaves the old one registered. The Fn key is required by default; keyboards without Fn can choose another chord. Secure Input/lock screens may block hotkeys. macOS exclusive registration detects registered conflicts and blocks activation until an available shortcut is chosen. Other utilities or OS gestures may still intercept keys; test delivery with your physical keyboard.
-4. Optionally enable **Launch Guillotine at login** in Settings. It launches disabled. Approve Login Items in System Settings if macOS requests it.
-5. **Quit Guillotine** releases the assertion before exiting. If the app crashes, macOS releases its process-scoped assertion automatically.
-
-The menu reports AC status and closed-lid requirements. “Display detected” includes virtual displays and does **not** certify clamshell operation. The bundled **Headless Setup & Limitations** guide is available from the menu, offline.
-
-## Remote access and permissions
-
-Guillotine needs no administrator, Accessibility, Input Monitoring, Screen Recording or network permission. It never unlocks the Mac or configures sharing. Enable Remote Login or Screen Sharing yourself under System Settings → General → Sharing. Streaming hosts need their own permissions.
-
-- **SSH:** no graphical display required. Requires the Mac and network to remain awake.
-- **macOS Screen Sharing:** native support; High Performance virtual displays require compatible Apple Silicon Macs with macOS 14+. Authentication and FileVault remain normal.
-- **Sunshine + Moonlight:** Sunshine has experimental native arm64/x86_64 macOS support; Moonlight is the client. Capture requires an available display and host permissions. Sleeping/removed physical displays need testing with a virtual display or dummy plug.
-- **Vibepollo:** fork/version dependent. Nonary’s upstream has macOS workflow code, but inherited Sunshine install docs do not prove a published, functioning macOS release. Its Windows/Linux virtual-display features are not a macOS guarantee. Verify your exact release; Guillotine makes no runtime compatibility claim.
-
-During host testing, a running Vibepollo process was observed holding its **own display-sleep assertion** while streaming. Such a host can keep the physical display awake independently of Guillotine. Guillotine cannot guarantee display timeout while another app prevents it, and does not release or override another app’s assertions. This observation does not certify end-to-end streaming with the lid closed.
-
-Source links, capture details and constraints are in [PLATFORM.md](docs/PLATFORM.md). Network and streaming operation are unchanged by Guillotine; no display surface is created or removed.
-
-## Reliability and removal
-
-Only a `PreventUserIdleSystemSleep` IOKit assertion is owned. No `pmset`, brightness, backlight, lock, display, network or authentication settings are changed. Releasing it resumes normal policy without forcing sleep or terminating remote sessions. User changes to system settings are therefore never overwritten. Disable, Quit, power loss, unknown power state and requested system sleep all release the assertion. Start-up failures block activation and show an actionable error.
-
-Remove by turning off launch at login, quitting, then deleting `Guillotine.app`. There is no helper to install/remove and no power-setting recovery procedure. Preferences contain only the shortcut; delete the `dev.guillotine.Guillotine` defaults domain if desired.
-
-## Tests and development
+The supplied app and guard are Developer ID signed with hardened runtime and secure timestamps, but not notarized. For distribution, sign/notarize using your own Apple credentials. Do not weaken Gatekeeper or SIP.
 
 ```sh
 xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
-  -destination 'platform=macOS' -derivedDataPath build \
-  CODE_SIGN_IDENTITY=- test
+  -destination 'platform=macOS' -derivedDataPath build CODE_SIGN_IDENTITY=- test
+python3 scripts/test-guard.py build/Build/Products/Debug/GuillotineGuard
 ```
 
-See [TESTING.md](docs/TESTING.md) for results actually obtained and the physical-hardware/second-device checklist. Unit tests cover fail-closed power handling, activation races, restoration, failure paths, repeated toggles and shortcut persistence, plus real IOKit acquisition/release.
+The guard test flag uses fake hardware only. It is not a system-power override. Test results and remaining physical/remote checks are in [docs/TESTING.md](docs/TESTING.md). API references are in [docs/PLATFORM.md](docs/PLATFORM.md). `./scripts/make-icon.sh` regenerates app artwork from the same vector drawing as the menu and Settings icons.
 
-Sources are in `Sources/Guillotine`. `SessionController` contains the serial state machine; `PowerMonitor` owns the main-run-loop notification source; `IdleSleepAssertion` owns the process-scoped override. AppKit provides the menu and Carbon hotkey registration; SwiftUI provides Settings. `project.yml` optionally regenerates the project with XcodeGen. `./scripts/make-icon.sh` regenerates all icon sizes.
-
-Contributions should preserve AC-only activation, never persist the active state, and include transition tests and hardware results for any new power controls. Licensed under GPL-3.0-only. See LICENSE for the complete GNU General Public License version 3.
-
-The repository is private during development. GPL-3.0-only applies to the code and original icon artwork; private hosting does not change the license.
+GPL-3.0-only, including original artwork; see LICENSE. The repository remains private during development.

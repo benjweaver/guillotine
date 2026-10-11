@@ -17,27 +17,27 @@ enum PowerState: String, Equatable {
     }
 }
 
-@MainActor protocol SleepAssertion: AnyObject {
+@MainActor protocol HardwareControl: AnyObject {
     func acquire() throws
     func release() throws
 }
 
 /// Every event and both activation power checks run synchronously on the main actor.
-/// Enabled is deliberately never persisted. The assertion is the only owned override.
+/// Enabled is deliberately never persisted. Only physical panel power and keyboard backlight are owned.
 @MainActor final class SessionController: ObservableObject {
     @Published private(set) var enabled = false
     @Published private(set) var power: PowerState = .unknown
-    @Published private(set) var message = "Headless Mode starts off."
+    @Published private(set) var message = "Physical controls start restored. Sleep policy is independent."
     @Published private(set) var error: String?
     var monitoringAvailable = false
     var shortcutAvailable = false
     var onChange: (() -> Void)?
 
-    private let assertion: SleepAssertion
+    private let controls: HardwareControl
     private let readPower: () -> PowerState
 
-    init(assertion: SleepAssertion, readPower: @escaping () -> PowerState) {
-        self.assertion = assertion
+    init(controls: HardwareControl, readPower: @escaping () -> PowerState) {
+        self.controls = controls
         self.readPower = readPower
     }
 
@@ -46,7 +46,7 @@ enum PowerState: String, Equatable {
     func powerChanged(_ value: PowerState) {
         power = value
         if value != .external && enabled {
-            disable(reason: "Headless Mode turned off: \(value.label.lowercased()).")
+            disable(reason: "Guillotine turned off: \(value.label.lowercased()).")
         }
         onChange?()
     }
@@ -62,41 +62,43 @@ enum PowerState: String, Equatable {
             fail("The disable shortcut is unavailable. Choose an unused shortcut in Settings.")
             return
         }
-        // Never trust the cached menu value when acquiring an assertion.
+        // Never trust the cached menu value before taking ownership of physical controls.
         power = readPower()
         guard power == .external else {
-            fail("Connect external power before enabling Headless Mode. Charging is not required.")
+            fail("Connect external power before enabling Guillotine. Charging is not required.")
             return
         }
         do {
-            try assertion.acquire()
+            try controls.acquire()
             enabled = true
             // Close the check/acquire window. The notification source handles later changes.
             power = readPower()
             if power != .external {
-                disable(reason: "Power changed during activation; Headless Mode turned off.")
+                disable(reason: "Power changed during activation; Guillotine turned off.")
                 return
             }
-            message = "Idle system sleep prevented. Display sleep remains allowed."
+            message = "Built-in panel power and keyboard backlight off requested. Sleep settings unchanged."
             onChange?()
         } catch {
-            fail("Could not prevent idle sleep: \(error.localizedDescription)")
+            fail("Could not cut screen and keyboard power: \(error.localizedDescription)")
         }
     }
 
-    func disable(reason: String = "Headless Mode is off. Normal sleep policies apply.") {
+    func disable(reason: String = "Physical panel and keyboard backlight restored.") {
         guard enabled else { return }
         do {
-            try assertion.release()
+            try controls.release()
             enabled = false
             error = nil
             message = reason
             onChange?()
         } catch {
             // Do not pretend release succeeded. Keep ownership so another disable can retry.
-            fail("Could not release the sleep assertion: \(error.localizedDescription). Retry Disable or quit Guillotine; macOS releases it when the process exits.")
+            fail("Could not restore physical controls: \(error.localizedDescription). Retry Restore or quit Guillotine; the independent guard restores on disconnect or lease expiry.")
         }
     }
+
+    func reportError(_ text: String) { fail(text) }
 
     private func fail(_ description: String) {
         error = description

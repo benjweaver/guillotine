@@ -7,7 +7,7 @@ import Carbon
 struct Shortcut: Equatable {
     var key: UInt32
     var modifiers: UInt32
-    static let standard = Shortcut(key: UInt32(kVK_Space), modifiers: UInt32(cmdKey | optionKey | controlKey) | UInt32(kEventKeyModifierFnMask))
+    static let standard = Shortcut(key: UInt32(kVK_Space), modifiers: UInt32(cmdKey | optionKey | controlKey))
     static let keys: [(String, UInt32)] = [
         ("Space", UInt32(kVK_Space)), ("A", 0), ("B", 11), ("C", 8), ("D", 2), ("E", 14), ("F", 3),
         ("G", 5), ("H", 4), ("I", 34), ("J", 38), ("K", 40), ("L", 37),

@@ -10,14 +10,15 @@ import AppKit
 }
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private let session = SessionController(assertion: IdleSleepAssertion(), readPower: PowerMonitor.current)
+    private let controls = PhysicalControls()
+    private lazy var session = SessionController(controls: controls, readPower: PowerMonitor.current)
     private let monitor = PowerMonitor()
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
     private var observations: [NSObjectProtocol] = []
     private lazy var preferences = PreferencesModel()
     private lazy var shortcut = GlobalShortcut { [weak self] in
-        self?.session.disable(reason: "Headless Mode turned off with the global shortcut.")
+        self?.session.disable(reason: "Physical controls turned off with the global shortcut.")
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -38,23 +39,16 @@ import AppKit
             try shortcut.register(preferences.shortcut)
             session.shortcutAvailable = true
         } catch { preferences.shortcutError = error.localizedDescription }
-        let center = NSWorkspace.shared.notificationCenter
-        observations.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.session.disable(reason: "System sleep requested. Enable again when needed.") }
-        })
-        observations.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.session.refreshPower() }
-        })
-        observations.append(center.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.session.disable() }
-        })
+        controls.onStopped = { [weak self] in self?.session.disable(reason: "Physical controls restored by hardware guard.") }
+        do { try controls.recover() }
+        catch { session.reportError(error.localizedDescription) }
         updateIcon()
     }
 
     private func updateIcon() {
         guard let button = statusItem?.button else { return }
         button.image = GuillotineGlyph.menuImage(active: session.enabled)
-        button.toolTip = "Guillotine — Headless Mode \(session.enabled ? "On" : "Off") • \(session.power.label)"
+        button.toolTip = "Guillotine — Physical controls \(session.enabled ? "On" : "Off") • \(session.power.label)"
         button.setAccessibilityLabel(button.toolTip)
     }
 
@@ -64,13 +58,13 @@ import AppKit
         menu.removeAllItems()
         add("Guillotine · Off with the head", to: menu)
         menu.addItem(.separator())
-        let toggle = NSMenuItem(title: session.enabled ? "Disable Headless Mode" : "Enable Headless Mode", action: #selector(toggleMode), keyEquivalent: "")
+        let toggle = NSMenuItem(title: session.enabled ? "Restore Screen & Keyboard" : "Cut Screen & Keyboard", action: #selector(toggleMode), keyEquivalent: "")
         toggle.target = self
         toggle.state = session.enabled ? .on : .off
         menu.addItem(toggle)
         add(session.power.label, to: menu)
         add(DisplayStatus.summary, to: menu)
-        add(session.enabled ? "Display sleep and backlight timeout allowed" : "Normal sleep policies apply", to: menu)
+        add("Sleep settings and Caffeine remain independent", to: menu)
         if let error = session.error {
             let item = NSMenuItem()
             item.view = NSHostingView(rootView: Text(error).font(.caption).foregroundStyle(.red).frame(width: 290, alignment: .leading).padding(10))
@@ -95,12 +89,16 @@ import AppKit
         menu.addItem(item)
     }
     @objc private func toggleMode() {
-        if session.enabled { session.disable() } else { session.enable() }
+        if session.enabled { session.disable() } else {
+            controls.restoreOnSleep = preferences.restoreOnSleep
+            controls.restoreOnWake = preferences.restoreOnWake
+            session.enable()
+        }
         if session.error != nil { showSettings() }
     }
     @objc private func showSettings() {
         if settingsWindow == nil {
-            let controller = NSHostingController(rootView: SettingsView(session: session, preferences: preferences))
+            let controller = NSHostingController(rootView: SettingsView(session: session, preferences: preferences, toggle: { [weak self] in self?.toggleMode() }))
             let window = NSWindow(contentViewController: controller)
             window.title = "Guillotine Settings"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -134,13 +132,12 @@ import AppKit
 
 enum DisplayStatus {
     @MainActor static var summary: String {
-        guard PowerMonitor.hasInternalBattery else { return "Closed lid: not applicable to desktop Macs" }
-        let external = NSScreen.screens.contains { screen in
-            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return false }
-            return CGDisplayIsBuiltin(CGDirectDisplayID(number.uint32Value)) == 0
-        }
-        return external
-            ? "Closed lid: display detected; setup must be verified"
-            : "Closed lid: unavailable without clamshell setup"
+#if arch(arm64)
+        return PowerMonitor.hasInternalBattery
+            ? "Built-in panel power control • private macOS APIs"
+            : "Desktop/external panel power control unavailable"
+#else
+        return "Physical panel control requires Apple Silicon"
+#endif
     }
 }

@@ -6,7 +6,7 @@ import Carbon
 @testable import Guillotine
 
 @MainActor final class SessionTests: XCTestCase {
-    final class Assertion: SleepAssertion {
+    final class Assertion: HardwareControl {
         var acquisitions = 0
         var releases = 0
         var owned = false
@@ -24,7 +24,7 @@ import Carbon
         }
     }
     private func make(_ assertion: Assertion, read: @escaping () -> PowerState = { .external }) -> SessionController {
-        let controller = SessionController(assertion: assertion, readPower: read)
+        let controller = SessionController(controls: assertion, readPower: read)
         controller.monitoringAvailable = true
         controller.shortcutAvailable = true
         return controller
@@ -146,8 +146,8 @@ import Carbon
     func testShortcutValidationAndPersistence() {
         XCTAssertTrue(Shortcut.standard.valid)
         XCTAssertEqual(Shortcut.standard.key, UInt32(kVK_Space))
-        XCTAssertEqual(Shortcut.standard.modifiers, UInt32(cmdKey | optionKey | controlKey) | UInt32(kEventKeyModifierFnMask))
-        XCTAssertEqual(Shortcut.standard.label, "Fn⌃⌥⌘Space")
+        XCTAssertEqual(Shortcut.standard.modifiers, UInt32(cmdKey | optionKey | controlKey))
+        XCTAssertEqual(Shortcut.standard.label, "⌃⌥⌘Space")
         XCTAssertFalse(Shortcut(key: 4, modifiers: 0).valid)
         XCTAssertFalse(Shortcut(key: 999, modifiers: Shortcut.standard.modifiers).valid)
         let suite = "GuillotineTest-\(UUID().uuidString)"
@@ -159,13 +159,6 @@ import Carbon
         defaults.set(-100, forKey: "shortcutKey")
         defaults.set(-100, forKey: "shortcutModifiers")
         XCTAssertEqual(Shortcut.load(from: defaults), .standard)
-    }
-    func testRealIOKitAssertionAcquireAndRelease() throws {
-        let assertion = IdleSleepAssertion()
-        try assertion.acquire()
-        try assertion.acquire()
-        try assertion.release()
-        try assertion.release()
     }
     func testRealGlobalShortcutReplacementAndConflict() throws {
         let first = GlobalShortcut(action: {})
@@ -186,7 +179,7 @@ import Carbon
         defer { first.stop(); second.stop() }
         // The test host itself reserves the default. Add Shift for an independent
         // Fn+Space reservation so this test does not conflict with its own app.
-        let candidate = Shortcut(key: Shortcut.standard.key, modifiers: Shortcut.standard.modifiers | UInt32(shiftKey))
+        let candidate = Shortcut(key: Shortcut.standard.key, modifiers: Shortcut.standard.modifiers | UInt32(shiftKey) | UInt32(kEventKeyModifierFnMask))
         try first.register(candidate)
         XCTAssertThrowsError(try second.register(candidate))
         first.stop()

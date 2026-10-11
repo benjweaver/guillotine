@@ -10,6 +10,12 @@ import ServiceManagement
     @Published private(set) var loginEnabled = false
     @Published private(set) var loginNeedsApproval = false
     @Published var loginError: String?
+    @Published var restoreOnSleep = UserDefaults.standard.bool(forKey: "restoreOnSleep") {
+        didSet { UserDefaults.standard.set(restoreOnSleep, forKey: "restoreOnSleep") }
+    }
+    @Published var restoreOnWake = UserDefaults.standard.bool(forKey: "restoreOnWake") {
+        didSet { UserDefaults.standard.set(restoreOnWake, forKey: "restoreOnWake") }
+    }
     var applyShortcut: ((Shortcut) throws -> Void)?
 
     func changeShortcut(_ candidate: Shortcut) {
@@ -39,11 +45,13 @@ import ServiceManagement
 struct SettingsView: View {
     @ObservedObject var session: SessionController
     @ObservedObject var preferences: PreferencesModel
+    let toggle: () -> Void
     @State private var key: UInt32 = Shortcut.standard.key
     @State private var modifiers: UInt32 = Shortcut.standard.modifiers
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
                 Image(nsImage: GuillotineGlyph.menuImage(active: session.enabled))
@@ -60,8 +68,8 @@ struct SettingsView: View {
                 Label(session.power.label, systemImage: session.power == .external ? "powerplug.fill" : "battery.50")
                 Text(DisplayStatus.summary).font(.caption).foregroundStyle(.secondary)
                 Text(session.message).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button(session.enabled ? "Disable Headless Mode" : "Enable Headless Mode") {
-                    if session.enabled { session.disable() } else { session.enable() }
+                Button(session.enabled ? "Restore Screen & Keyboard" : "Cut Screen & Keyboard") {
+                    toggle()
                 }
                 if let error = session.error { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
             }
@@ -88,15 +96,22 @@ struct SettingsView: View {
                 if let error = preferences.shortcutError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
             }
             Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Stay headless across lock, sleep and wake by default.").font(.caption)
+                Toggle("Restore physical controls when sleeping", isOn: $preferences.restoreOnSleep)
+                Toggle("Restore physical controls when waking", isOn: $preferences.restoreOnWake)
+                Text("Changes apply next time you cut the lights. Sleep and Caffeine settings stay independent.").font(.caption).foregroundStyle(.secondary)
+            }
             Toggle("Launch Guillotine at login (always starts disabled)", isOn: Binding(get: { preferences.loginEnabled || preferences.loginNeedsApproval }, set: preferences.setLogin))
             if preferences.loginNeedsApproval {
                 Button("Approve in Login Items…") { SMAppService.openSystemSettingsLoginItems() }
             }
             if let error = preferences.loginError { Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true) }
-            Text("Lid-open and desktop operation use a temporary IOKit assertion. Closing a MacBook needs macOS clamshell setup; no software-only lid override is installed. A capturable desktop is a separate streaming requirement. See Headless Setup & Limitations in the menu.")
+            Text("Experimental private APIs switch off the built-in Apple Silicon panel and keyboard backlight while leaving its logical display connected. Lock does not change the mode. Lock-screen hotkey delivery needs testing; Mac sleep still interrupts streaming normally.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
-        .padding(24).frame(width: 500)
+        .padding(24)
+        }.frame(width: 500, height: 660)
         .onAppear { key = preferences.shortcut.key; modifiers = preferences.shortcut.modifiers; session.refreshPower() }
         .onChange(of: scenePhase) { _ in preferences.refreshLoginStatus() }
     }

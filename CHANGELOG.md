@@ -4,6 +4,10 @@ All notable changes are documented here using Keep a Changelog.
 
 ## Unreleased
 
+### Added
+
+- Homebrew cask installation through `benjweaver/guillotine/guillotine`, with verified release checksums and tap updates from the release script.
+
 ## [1.0.0] - 2026-10-10
 
 ### Added

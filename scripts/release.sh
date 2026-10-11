@@ -7,7 +7,6 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 version=$(sed -n "s/.*MARKETING_VERSION: '\([^']*\)'.*/\1/p" project.yml)
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid project version' >&2; exit 1; }
 [[ -z "$(git status --porcelain)" ]] || { echo 'Commit all release changes first' >&2; exit 1; }
-[[ "$(gh repo view --json isPrivate --jq .isPrivate)" == true ]] || { echo 'This release workflow requires a private repository' >&2; exit 1; }
 commit=$(git rev-parse HEAD)
 [[ "$(git ls-remote origin refs/heads/main | cut -f1)" == "$commit" ]] || { echo 'Push the release commit to main first' >&2; exit 1; }
 tag="v$version"
@@ -64,4 +63,15 @@ PY
 gh release create "$tag" --target "$commit" --title "Guillotine $version" --draft \
   --notes-file "$out/RELEASE-NOTES.md" "$archive" "$source" "$out/SHA256SUMS.txt"
 gh release edit "$tag" --draft=false --latest
-echo "Published $tag from $commit; artifacts: $out"
+# Update the tap directly, like Revoke; no scheduled release polling.
+tapdir=$(mktemp -d)
+trap 'rm -rf "$tapdir"' EXIT
+gh repo clone benjweaver/homebrew-guillotine "$tapdir" -- -q
+bash "$tapdir/scripts/update-cask.sh" "$tag"
+if ! git -C "$tapdir" diff --quiet; then
+  git -C "$tapdir" add Casks/guillotine.rb
+  git -C "$tapdir" commit -m "Update Guillotine to $version" \
+    -m "Point the cask at the verified notarized release archive."
+  git -C "$tapdir" push
+fi
+echo "Published $tag from $commit and updated the Homebrew tap; artifacts: $out"

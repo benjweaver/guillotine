@@ -4,6 +4,20 @@
 
 Lid-open controls leave sleep settings and Caffeine independent. **Optional closed-lid support requires an approved privileged helper and temporarily disables system sleep globally, including ordinary and manual sleep.** That broader control replaces the experimental lid-only override, which failed the physical test on this Mac. No brightness-zero substitute is used for the panel.
 
+## Install with Homebrew
+
+```sh
+brew install --cask benjweaver/guillotine/guillotine
+```
+
+Update with `brew upgrade --cask benjweaver/guillotine/guillotine`. The tap uses
+standard GitHub release URLs, like Revoke; unauthenticated installation becomes
+available when Ben makes the app and tap repositories public.
+
+Before upgrading, Restore in Guillotine. Reload the helper in Settings if the
+release changes it. Before uninstalling, Restore, Remove Helper, and disable
+launch at login. Recovery journals are retained, including with `brew zap`.
+
 ## Supported setup
 
 macOS 13+, Apple Silicon MacBooks. Hardware checked: MacBookPro18,1, macOS 27.0.1. Panel power uses private IOMobileFramebuffer APIs; keyboard brightness uses private CoreBrightness APIs, with zero readback verified. Both can change after OS updates. Intel, desktop, and external-panel power control are not implemented; the universal executable reports unsupported hardware clearly.
@@ -57,7 +71,7 @@ xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
   CODE_SIGN_IDENTITY=- ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
 ```
 
-Ad hoc builds can exercise lid-open controls and fake tests. **Real privileged XPC requires matching trusted signatures**: change the two requirements in `Sources/Shared/LidService.h` to your signing identity and sign the app and both helpers consistently. This local build uses Ben Weaver’s Developer ID (AR25V66TVY), hardened runtime, and secure timestamps. Release archives are notarized and stapled. Development installs are signed but may not be notarized. The repository and releases remain private.
+Ad hoc builds can exercise lid-open controls and fake tests. **Real privileged XPC requires matching trusted signatures**: change the two requirements in `Sources/Shared/LidService.h` to your signing identity and sign the app and both helpers consistently. This local build uses Ben Weaver’s Developer ID (AR25V66TVY), hardened runtime, and secure timestamps. Release archives are notarized and stapled. Development installs are signed but may not be notarized. Repository visibility is controlled by Ben.
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -67,7 +81,7 @@ python3 scripts/test-guard.py build/Build/Products/Debug/GuillotineGuard
 python3 scripts/test-lid-helper.py build/Build/Products/Debug/GuillotineLidHelper
 ```
 
-Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-only; see LICENSE. Repository remains private during development.
+Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-only; see LICENSE. Repository visibility is controlled by Ben.
 
 ## Release
 
@@ -76,8 +90,10 @@ Set the release version/build in `project.yml`, add its dated section to
 `./scripts/release.sh` on the signing Mac. It builds both architectures, runs
 the app and fake guard/helper tests, notarizes with the existing `notary`
 keychain profile, staples and verifies the app, and publishes the ZIP, source
-ZIP, and SHA-256 checksums to a private GitHub release. Release notes come from
-that version’s changelog section. Logs and assets stay in `../../work`.
+ZIP, and SHA-256 checksums to a GitHub release, then updates the Homebrew cask.
+Release notes come from that version’s changelog section. Logs and assets stay in `../../work`.
 
-This private project has no Homebrew tap; the script does not create one or
-change distribution visibility. Hardware acceptance is required before release.
+The release script updates `benjweaver/homebrew-guillotine` directly after
+publishing, using the release archive and verified checksum. It does not change
+repository visibility or schedule polling. Hardware acceptance is required
+before release.

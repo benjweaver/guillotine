@@ -57,7 +57,7 @@ xcodebuild -project Guillotine.xcodeproj -scheme Guillotine \
   CODE_SIGN_IDENTITY=- ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
 ```
 
-Ad hoc builds can exercise lid-open controls and fake tests. **Real privileged XPC requires matching trusted signatures**: change the two requirements in `Sources/Shared/LidService.h` to your signing identity and sign the app and both helpers consistently. This local build uses Ben Weaver’s Developer ID (AR25V66TVY), hardened runtime, and secure timestamps. It is a private test build, not a notarized release.
+Ad hoc builds can exercise lid-open controls and fake tests. **Real privileged XPC requires matching trusted signatures**: change the two requirements in `Sources/Shared/LidService.h` to your signing identity and sign the app and both helpers consistently. This local build uses Ben Weaver’s Developer ID (AR25V66TVY), hardened runtime, and secure timestamps. Release archives are notarized and stapled. Development installs are signed but may not be notarized. The repository and releases remain private.
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -68,3 +68,16 @@ python3 scripts/test-lid-helper.py build/Build/Products/Debug/GuillotineLidHelpe
 ```
 
 Fake tests never invoke hardware controls or write system power settings. See [tests and physical checklist](docs/TESTING.md). Artwork comes from one vector drawing via `scripts/make-icon.sh`, matching the menu and Settings icons. GPL-3.0-only; see LICENSE. Repository remains private during development.
+
+## Release
+
+Set the release version/build in `project.yml`, add its dated section to
+`CHANGELOG.md`, regenerate with `xcodegen generate`, commit, and push. Run
+`./scripts/release.sh` on the signing Mac. It builds both architectures, runs
+the app and fake guard/helper tests, notarizes with the existing `notary`
+keychain profile, staples and verifies the app, and publishes the ZIP, source
+ZIP, and SHA-256 checksums to a private GitHub release. Release notes come from
+that version’s changelog section. Logs and assets stay in `../../work`.
+
+This private project has no Homebrew tap; the script does not create one or
+change distribution visibility. Hardware acceptance is required before release.

@@ -1,28 +1,26 @@
 # Changelog
 
-All notable changes will be documented here using Keep a Changelog.
+All notable changes are documented here using Keep a Changelog.
 
 ## Unreleased
 
-### Changed
-
-- Make the restore shortcut and explicit restore command request panel power-on even when no hardware session journal remains. Startup recovery still touches only owned changes.
-
-- Dismiss the status menu explicitly on clicks in another app or the Settings window; remove event monitors when the menu closes.
-
-- Replace the failed experimental clamshell bit with an optional approved root helper that leases the global sleep-disable control.
-- Explain that closed-lid support also blocks ordinary/manual sleep while active.
-- Show helper actions only when appropriate to installation/approval state.
-- Preserve battery opt-in, physical screen/backlight controls, restore shortcut, and normal lock behavior.
+## [1.0.0] - 2026-10-10
 
 ### Added
 
-- Optional automatic battery sleep at an editable percentage (10% by default), with restoration before sleep and a complete opt-out.
-- Optional battery Low Power Mode whenever on battery or below an editable percentage (20% preset), leased through the power helper with exact prior-setting recovery.
-- A note that Low Power Mode may reduce heat and help avoid thermal limits.
+- Native macOS menu bar controls to turn off the built-in Apple Silicon panel and keyboard backlight while retaining the logical display for remote access.
+- Configurable global restore shortcut, defaulting to Control–Option–Command–Space, and an explicit panel rescue when already disabled.
+- Optional closed-lid operation through a signed, privileged helper with five-second leases, recovery journals, and restoration after disconnect or failure.
+- Opt-in battery operation, restoration when disallowed power disconnects, and thermal-pressure sleep protection on battery.
+- Optional sleep at a user-selected battery percentage, defaulting to 10%, with a complete opt-out.
+- Optional Low Power Mode throughout battery operation or at a user-selected percentage (20% preset), with restoration of the prior battery setting.
+- Optional built-in speaker mute while headless, preserving virtual and external audio outputs.
+- Optional launch at login, disabled startup, and independent sleep/wake restoration preferences. Locking does not change headless status.
+- Matching app, menu bar, and Settings artwork; GPL-3.0-only source and a complete universal Xcode project.
+- A local release script with automated tests, Developer ID signing, Apple notarization, and private GitHub release assets.
 
-- Optional menu checkbox to mute built-in speakers while headless, with live toggling, durable restoration, and no changes to streaming audio outputs.
+### Known limitations
 
-- Root-owned recovery journal, signed XPC peer checks, five-second helper lease, and independent power/thermal cleanup.
-- Helper installation/removal controls and lifecycle tests, including daemon crash recovery.
-- Compiler warnings as errors and release-Xcode verification.
+- Physical panel and keyboard controls use private macOS APIs and require revalidation after OS updates. Intel binaries are included, but physical panel control is unsupported there.
+- Closed-lid support blocks ordinary and manual system sleep while active. Capturable displays and uninterrupted streams depend on the remote host and display setup; Guillotine does not hide lid state or create a virtual display.
+- Lock-screen shortcut delivery, actual battery-percentage sleep, minimum macOS 13 runtime behavior, and Intel hardware remain unverified. See docs/TESTING.md for the full test record.

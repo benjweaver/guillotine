@@ -22,6 +22,26 @@
 - (float)brightnessForKeyboard:(uint64_t)keyboard;
 - (BOOL)setBrightness:(float)value forKeyboard:(uint64_t)keyboard;
 @end
+// Private CoreGraphics virtual display classes, resolved at runtime.
+@interface CGVirtualDisplayDescriptor : NSObject
+@property (retain, nonatomic) dispatch_queue_t queue;
+@property (retain, nonatomic) NSString *name;
+@property (nonatomic) unsigned int maxPixelsHigh, maxPixelsWide, serialNum, productID, vendorID;
+@property (nonatomic) CGSize sizeInMillimeters;
+@property (copy, nonatomic) void (^terminationHandler)(id, id);
+@end
+@interface CGVirtualDisplayMode : NSObject
+- (instancetype)initWithWidth:(unsigned int)width height:(unsigned int)height refreshRate:(double)refreshRate;
+@end
+@interface CGVirtualDisplaySettings : NSObject
+@property (retain, nonatomic) NSArray *modes;
+@property (nonatomic) unsigned int hiDPI;
+@end
+@interface CGVirtualDisplay : NSObject
+@property (readonly, nonatomic) unsigned int displayID;
+- (instancetype)initWithDescriptor:(CGVirtualDisplayDescriptor *)descriptor;
+- (BOOL)applySettings:(CGVirtualDisplaySettings *)settings;
+@end
 typedef kern_return_t (*OpenPanel)(io_service_t, task_port_t, unsigned int, void **);
 typedef kern_return_t (*SetPanelPower)(void *, uint32_t);
 static void *panel;
@@ -38,6 +58,7 @@ static io_connect_t powerConnection;
 static NSString *directory;
 static NSArray *lastDisplayConfiguration;
 static NSArray *lastPanelEnableConfiguration;
+static id anchorDisplay;
 static NSTimer *panelReapplyTimer;
 static NSTimeInterval lastPanelOff;
 static BOOL systemSleeping;
@@ -331,6 +352,43 @@ static BOOL otherDisplayIsActive(void) {
     }
     return NO;
 }
+// Keeps WindowServer's compositor ready while the built-in panel is off and
+// no other display exists. It lives until this process exits, which is after
+// restore() has powered the panel back on.
+static BOOL createAnchorDisplay(void) {
+    if (anchorDisplay) return YES;
+    if (fake) {
+        if ([[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-anchor-fails"]]) return NO;
+        [@"created" writeToFile:[directory stringByAppendingPathComponent:@"test-anchor-created"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [[NSFileManager defaultManager] removeItemAtPath:[directory stringByAppendingPathComponent:@"test-no-other-display"] error:nil];
+        anchorDisplay=@"fake";
+        return YES;
+    }
+    Class descriptorClass=NSClassFromString(@"CGVirtualDisplayDescriptor"), displayClass=NSClassFromString(@"CGVirtualDisplay");
+    Class settingsClass=NSClassFromString(@"CGVirtualDisplaySettings"), modeClass=NSClassFromString(@"CGVirtualDisplayMode");
+    if (!descriptorClass || !displayClass || !settingsClass || !modeClass) return NO;
+    CGVirtualDisplayDescriptor *descriptor=[[descriptorClass alloc] init];
+    descriptor.queue=dispatch_queue_create("dev.guillotine.anchor-display",DISPATCH_QUEUE_SERIAL);
+    descriptor.name=@"Guillotine";
+    descriptor.maxPixelsWide=1280; descriptor.maxPixelsHigh=720;
+    descriptor.sizeInMillimeters=CGSizeMake(1280/110.0*25.4,720/110.0*25.4);
+    descriptor.vendorID=0x6C47; descriptor.productID=1; descriptor.serialNum=1;
+    descriptor.terminationHandler=^(id a, id b){ NSLog(@"macOS removed the Guillotine anchor display"); };
+    CGVirtualDisplay *display=[[displayClass alloc] initWithDescriptor:descriptor];
+    if (!display) return NO;
+    CGVirtualDisplaySettings *settings=[[settingsClass alloc] init];
+    settings.hiDPI=0;
+    settings.modes=@[[[modeClass alloc] initWithWidth:1280 height:720 refreshRate:60]];
+    if (![display applySettings:settings]) return NO;
+    CGDirectDisplayID identifier=display.displayID;
+    for (int i=0;i<50;i++) {
+        CGDirectDisplayID active[16]; uint32_t count=0;
+        if (CGGetActiveDisplayList(16,active,&count)==kCGErrorSuccess)
+            for (uint32_t j=0;j<count;j++) if (active[j]==identifier) { anchorDisplay=display; return YES; }
+        [NSThread sleepForTimeInterval:0.1];
+    }
+    return NO;
+}
 static void reapplyPanelOff(NSString *reason) {
     if (!ready || finished || systemSleeping || !lidIsOpen()) return;
     if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
@@ -490,9 +548,9 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!maintainControls(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
     // Activation and settled display events own panel writes, never lease renewals.
     // Ownership was journaled before this write so failures and crashes can restore it.
-    if (!otherDisplayIsActive()) {
-        emit(@"ERROR Another display is required. With the built-in panel off and no other display, macOS stops WindowServer. Connect a display or start a remote stream first.");
-        finish(2,@"No other display is active");
+    if (!otherDisplayIsActive() && !createAnchorDisplay()) {
+        emit(@"ERROR Could not create the display Guillotine needs while the panel is off. With the built-in panel off and no other display, macOS stops WindowServer.");
+        finish(2,@"Anchor display unavailable");
     }
     if (!requestPanelPower(0)) {
         emit(@"ERROR macOS rejected built-in panel power control.");

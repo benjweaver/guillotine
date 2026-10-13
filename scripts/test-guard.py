@@ -112,10 +112,18 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.panel_requests(), '0\n0\n')
         child.stdin.close(); self.restored(child)
         self.assertEqual(self.panel_requests(), '0\n0\n1\n')
-    def test_activation_refuses_when_the_builtin_is_the_only_display(self):
+    def test_activation_creates_an_anchor_display_when_the_builtin_is_the_only_display(self):
         (self.folder / 'test-no-other-display').touch()
+        child = self.start(); self.ready(child)
+        self.assertTrue((self.folder / 'test-anchor-created').exists())
+        self.assertEqual(self.panel_requests(), '0\n')
+        child.stdin.close(); self.restored(child)
+        self.assertEqual(self.panel_requests(), '0\n1\n')
+    def test_activation_refuses_without_changing_the_panel_when_the_anchor_cannot_be_created(self):
+        (self.folder / 'test-no-other-display').touch()
+        (self.folder / 'test-anchor-fails').touch()
         child = self.start()
-        self.assertTrue(child.stdout.readline().startswith(b'ERROR Another display is required'))
+        self.assertTrue(child.stdout.readline().startswith(b'ERROR Could not create the display'))
         child.wait(timeout=10)
         # Only the restoring power-on; the panel is never powered off.
         self.assertEqual(self.panel_requests(), '1\n')

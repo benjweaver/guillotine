@@ -6,7 +6,7 @@ All notable changes are documented here using Keep a Changelog.
 
 ### Fixed
 
-- Never leave the built-in panel off while it is the only active display. macOS marks the display stuck about ten seconds later and its watchdog restarts WindowServer after about forty, which logged you out twice when a remote stream ended and its virtual display went away. Guard now refuses to activate without another active display, powers the panel back on if the other display disappears, and powers it off again when one returns.
+- Never leave the built-in panel off while it is the only active display. macOS marks the display stuck about ten seconds later and its watchdog restarts WindowServer after about forty, which logged you out twice when a remote stream ended and its virtual display went away. Guard now powers the panel back on if the only other display disappears and turns it off again when one returns. When the built-in panel would be the only display at activation, Guard creates a small private virtual display so macOS keeps the compositor ready; it is removed on restore. Tested on hardware: the panel stayed off for 75 seconds on the built-in display alone, with no WindowServer stall.
 
 ## [1.0.2] - 2026-10-11
 

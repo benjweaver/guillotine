@@ -2,7 +2,7 @@
 
 All notable changes are documented here using Keep a Changelog.
 
-## [Unreleased]
+## [1.0.3] - 2026-10-12
 
 ### Fixed
 

@@ -112,6 +112,27 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.panel_requests(), '0\n0\n')
         child.stdin.close(); self.restored(child)
         self.assertEqual(self.panel_requests(), '0\n0\n1\n')
+    def test_activation_refuses_when_the_builtin_is_the_only_display(self):
+        (self.folder / 'test-no-other-display').touch()
+        child = self.start()
+        self.assertTrue(child.stdout.readline().startswith(b'ERROR Another display is required'))
+        child.wait(timeout=10)
+        # Only the restoring power-on; the panel is never powered off.
+        self.assertEqual(self.panel_requests(), '1\n')
+    def test_panel_is_left_on_when_the_other_display_goes_away_then_off_when_it_returns(self):
+        configuration = self.folder / 'test-display-configuration'
+        configuration.write_text('built-in + virtual')
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-no-other-display').touch()
+        configuration.write_text('built-in only')
+        self.wait_panel_requests(child, '0\n1\n')
+        # A built-in enable edge with no other display must not power it off either.
+        self.enable_panel_event(child, 'built-in enabled, only display')
+        self.wait_panel_requests(child, '0\n1\n1\n')
+        (self.folder / 'test-no-other-display').unlink()
+        configuration.write_text('built-in + virtual again')
+        self.wait_panel_requests(child, '0\n1\n1\n0\n')
+        child.stdin.close(); self.restored(child)
     def enable_panel_event(self, child, configuration):
         (self.folder / 'test-display-configuration').write_text(configuration)
         child.stdin.write(b'test-panel-enabled\n'); child.stdin.flush()

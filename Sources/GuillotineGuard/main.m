@@ -311,6 +311,26 @@ static NSArray *displayConfiguration(void) {
     }
     return @[configuration];
 }
+// WindowServer treats the built-in display as stuck when its panel is off and
+// it is the only display, and its watchdog kills WindowServer about 40 seconds
+// later. Another active display that is not a mirror of the built-in keeps the
+// compositor ready, so the panel may be off only while one exists.
+static BOOL otherDisplayIsActive(void) {
+    if (fake) return ![[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-no-other-display"]];
+    uint32_t count=0;
+    if (CGGetActiveDisplayList(0,NULL,&count)!=kCGErrorSuccess || !count) return NO;
+    NSMutableData *storage=[NSMutableData dataWithLength:count*sizeof(CGDirectDisplayID)];
+    CGDirectDisplayID *displays=storage.mutableBytes;
+    if (CGGetActiveDisplayList(count,displays,&count)!=kCGErrorSuccess) return NO;
+    for (uint32_t i=0;i<count;i++) {
+        CGDirectDisplayID display=displays[i];
+        if (CGDisplayIsBuiltin(display) || CGDisplayIsAsleep(display)) continue;
+        CGDirectDisplayID mirrored=CGDisplayMirrorsDisplay(display);
+        if (mirrored!=kCGNullDirectDisplay && CGDisplayIsBuiltin(mirrored)) continue;
+        return YES;
+    }
+    return NO;
+}
 static void reapplyPanelOff(NSString *reason) {
     if (!ready || finished || systemSleeping || !lidIsOpen()) return;
     if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
@@ -318,6 +338,14 @@ static void reapplyPanelOff(NSString *reason) {
     }
     if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
     enforcePolicy();
+    if (!otherDisplayIsActive()) {
+        // No retry timer: the next display change, such as a remote display
+        // returning, schedules the panel-off again.
+        if (!requestPanelPower(1)) finish(2,@"Panel power control failed after display transition");
+        lastPanelOff=NSProcessInfo.processInfo.systemUptime;
+        NSLog(@"Panel left on after %@: the built-in display is the only display",reason);
+        return;
+    }
     if (!requestPanelPower(0)) finish(2,@"Panel power control failed after display transition");
     lastPanelOff=NSProcessInfo.processInfo.systemUptime;
     NSLog(@"Panel-off requested after %@",reason);
@@ -462,6 +490,10 @@ int main(int argc, char **argv) { @autoreleasepool {
     if (!maintainControls(&error)) { emit([@"ERROR " stringByAppendingString:error]); finish(2,error); }
     // Activation and settled display events own panel writes, never lease renewals.
     // Ownership was journaled before this write so failures and crashes can restore it.
+    if (!otherDisplayIsActive()) {
+        emit(@"ERROR Another display is required. With the built-in panel off and no other display, macOS stops WindowServer. Connect a display or start a remote stream first.");
+        finish(2,@"No other display is active");
+    }
     if (!requestPanelPower(0)) {
         emit(@"ERROR macOS rejected built-in panel power control.");
         finish(2,@"Panel power control failed");

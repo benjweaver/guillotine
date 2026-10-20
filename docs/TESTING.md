@@ -2,6 +2,10 @@
 
 Host: MacBookPro18,1, macOS 27.0.1. Build 9 uses release Xcode 27, macOS 13 app deployment, and compiler warnings as errors. XCTest targets 14 to match the installed XCTest libraries. Intel hardware and minimum-OS runtime testing remain outstanding.
 
+## Disconnect fix — 2026-10-19
+
+Ben confirmed that signed local test build 21 kept the built-in screen off after a remote stream disconnected. Release 1.0.4 (build 22) includes the same guard change.
+
 ## Actually run
 
 - 19 XCTest cases pass: disabled launch, battery opt-in, power loss/reconnect, live policy revocation, rechecks around activation, repeated toggles, failure/retry, and shortcut registration/callback behavior.

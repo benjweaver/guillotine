@@ -127,10 +127,22 @@ class GuardTests(unittest.TestCase):
         child.wait(timeout=10)
         # Only the restoring power-on; the panel is never powered off.
         self.assertEqual(self.panel_requests(), '1\n')
-    def test_panel_is_left_on_when_the_other_display_goes_away_then_off_when_it_returns(self):
+    def test_disconnect_creates_anchor_and_keeps_panel_off(self):
+        child = self.start(); self.ready(child)
+        (self.folder / 'test-no-other-display').touch()
+        (self.folder / 'test-display-configuration').write_text('stream disconnected')
+        self.wait_panel_requests(child, '0\n0\n')
+        self.assertTrue((self.folder / 'test-anchor-created').exists())
+        # A later loss must refresh an existing anchor too.
+        (self.folder / 'test-no-other-display').touch()
+        self.enable_panel_event(child, 'anchor lost')
+        self.wait_panel_requests(child, '0\n0\n0\n')
+        child.stdin.close(); self.restored(child)
+    def test_panel_is_left_on_when_anchor_fails_then_off_when_display_returns(self):
         configuration = self.folder / 'test-display-configuration'
         configuration.write_text('built-in + virtual')
         child = self.start(); self.ready(child)
+        (self.folder / 'test-anchor-fails').touch()
         (self.folder / 'test-no-other-display').touch()
         configuration.write_text('built-in only')
         self.wait_panel_requests(child, '0\n1\n')

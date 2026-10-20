@@ -23,7 +23,10 @@ take precedence over a pending write. The build-17 physical test passed: the use
 disconnect with the lid open and normal restoration. Fake events establish
 scheduling, not panel darkness.
 
-There is no separate panel-control preference. Startup recovery honors recorded
+If a display transition leaves no active independent display, Guillotine checks
+and refreshes its own virtual anchor before turning the panel on. The panel-on
+fallback protects WindowServer if macOS will not provide an active anchor. There
+is no separate panel-control preference. Startup recovery honors recorded
 panel ownership, including keyboard-only journals from builds 11–12. The restore
 shortcut while disabled still provides explicit panel-on rescue. Leave the lid
 open for the current workflow; closed-lid streaming remains unreliable.

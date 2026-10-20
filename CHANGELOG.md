@@ -2,6 +2,12 @@
 
 All notable changes are documented here using Keep a Changelog.
 
+## [1.0.4] - 2026-10-19
+
+### Fixed
+
+- Keep the built-in screen off after a remote stream disconnects by creating or refreshing Guillotine’s virtual anchor display when no independent active display remains. Retain the panel-on fallback if macOS cannot provide an active anchor. Verified on hardware with test build 21.
+
 ## [1.0.3] - 2026-10-12
 
 ### Fixed

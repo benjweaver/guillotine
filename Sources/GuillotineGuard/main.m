@@ -352,11 +352,25 @@ static BOOL otherDisplayIsActive(void) {
     }
     return NO;
 }
+static BOOL anchorDisplayIsActive(void) {
+    if (!anchorDisplay) return NO;
+    if (fake) return ![[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-no-other-display"]];
+    CGVirtualDisplay *display=anchorDisplay;
+    CGDirectDisplayID identifier=display.displayID;
+    uint32_t count=0;
+    if (CGGetActiveDisplayList(0,NULL,&count)!=kCGErrorSuccess || !count) return NO;
+    NSMutableData *storage=[NSMutableData dataWithLength:count*sizeof(CGDirectDisplayID)];
+    CGDirectDisplayID *displays=storage.mutableBytes;
+    if (CGGetActiveDisplayList(count,displays,&count)!=kCGErrorSuccess) return NO;
+    for (uint32_t i=0;i<count;i++)
+        if (displays[i]==identifier) return !CGDisplayIsAsleep(identifier);
+    return NO;
+}
 // Keeps WindowServer's compositor ready while the built-in panel is off and
 // no other display exists. It lives until this process exits, which is after
 // restore() has powered the panel back on.
 static BOOL createAnchorDisplay(void) {
-    if (anchorDisplay) return YES;
+    if (anchorDisplay && anchorDisplayIsActive()) return YES;
     if (fake) {
         if ([[NSFileManager defaultManager] fileExistsAtPath:[directory stringByAppendingPathComponent:@"test-anchor-fails"]]) return NO;
         [@"created" writeToFile:[directory stringByAppendingPathComponent:@"test-anchor-created"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
@@ -384,7 +398,7 @@ static BOOL createAnchorDisplay(void) {
     for (int i=0;i<50;i++) {
         CGDirectDisplayID active[16]; uint32_t count=0;
         if (CGGetActiveDisplayList(16,active,&count)==kCGErrorSuccess)
-            for (uint32_t j=0;j<count;j++) if (active[j]==identifier) { anchorDisplay=display; return YES; }
+            for (uint32_t j=0;j<count;j++) if (active[j]==identifier && !CGDisplayIsAsleep(identifier)) { anchorDisplay=display; return YES; }
         [NSThread sleepForTimeInterval:0.1];
     }
     return NO;
@@ -397,12 +411,15 @@ static void reapplyPanelOff(NSString *reason) {
     if (NSProcessInfo.processInfo.systemUptime>deadline) finish(0,@"Five-second lease expired");
     enforcePolicy();
     if (!otherDisplayIsActive()) {
-        // No retry timer: the next display change, such as a remote display
-        // returning, schedules the panel-off again.
-        if (!requestPanelPower(1)) finish(2,@"Panel power control failed after display transition");
-        lastPanelOff=NSProcessInfo.processInfo.systemUptime;
-        NSLog(@"Panel left on after %@: the built-in display is the only display",reason);
-        return;
+        // A stream disconnect may leave Guillotine's own anchor asleep or
+        // removed. Recreate it before powering on the built-in panel.
+        if (!createAnchorDisplay() || !otherDisplayIsActive()) {
+            // Keep WindowServer alive if macOS will not provide an anchor.
+            if (!requestPanelPower(1)) finish(2,@"Panel power control failed after display transition");
+            lastPanelOff=NSProcessInfo.processInfo.systemUptime;
+            NSLog(@"Panel left on after %@: no active independent display",reason);
+            return;
+        }
     }
     if (!requestPanelPower(0)) finish(2,@"Panel power control failed after display transition");
     lastPanelOff=NSProcessInfo.processInfo.systemUptime;

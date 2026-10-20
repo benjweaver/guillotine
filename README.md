@@ -2,6 +2,12 @@
 
 **Off with the head.** A native menu bar switch that powers off an Apple Silicon MacBook’s physical panel and keyboard backlight while retaining its logical display for remote access.
 
+<p align="center">
+  <img src="docs/screenshots/guillotine-menu.png" width="388" alt="Guillotine's menu: Enable Guillotine, Mute built-in speakers while headless, its status lines, Settings, Headless Setup & Limitations, and Quit.">
+  <br>
+  <sub>Taken in a virtual machine, which has no built-in panel, so panel control reads unavailable.</sub>
+</p>
+
 **Keep the lid open for the current supported workflow.** Enable Guillotine to turn off the panel and keyboard backlight, then use Caffeine independently if you want to prevent idle sleep. With the lid open, Guillotine immediately requests panel-off when macOS re-enables the built-in display; other display changes wait for the layout to settle. Panel power is not rewritten every second. No brightness-zero substitute is used for the panel.
 
 **Closed lid on AC power has worked in testing, without the helper.** With the lid closed, external power connected, the panel off, and another display active, macOS treated the Mac as docked (clamshell mode) and a remote stream kept running well past the idle-sleep timeout, with Caffeine on. The other display can be a stream's virtual display or Guillotine's own anchor display. This was seen on one MacBookPro18,1 running macOS 27.0.1 and is not guaranteed elsewhere. It does not work on battery: unplugging a MacBook with the lid closed put it to sleep even with Guillotine enabled and Caffeine running (confirmed 2026-10-13), as macOS sleeps a MacBook shortly after the lid closes on battery whatever apps are running.
@@ -96,6 +102,7 @@ the app and fake guard/helper tests, notarizes with the existing `notary`
 keychain profile, staples and verifies the app, and publishes the ZIP, source
 ZIP, and SHA-256 checksums to a GitHub release, then updates the Homebrew cask.
 Release notes come from that version’s changelog section. Logs and assets stay in `../../work`.
+After publishing, the script retakes `docs/screenshots/guillotine-menu.png` with `scripts/screenshots.sh` in the macOS VM and commits it; set `SKIP_SCREENSHOTS=1` to skip that.
 
 The release script updates `benjweaver/homebrew-guillotine` directly after
 publishing, using the release archive and verified checksum. It does not change

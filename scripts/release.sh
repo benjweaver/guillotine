@@ -74,4 +74,18 @@ if ! git -C "$tapdir" diff --quiet; then
     -m "Point the cask at the verified notarized release archive."
   git -C "$tapdir" push
 fi
+# Retake the README screenshots from the release just published, now that the tap serves it.
+# A failure here doesn't undo the release, so it only warns.
+if [[ "${SKIP_SCREENSHOTS:-0}" == 1 ]]; then
+  echo 'Skipped the screenshots (SKIP_SCREENSHOTS=1)'
+elif ./scripts/screenshots.sh; then
+  if [[ -n "$(git status --porcelain -- docs/screenshots)" ]]; then
+    git add docs/screenshots
+    git commit -m "Update the screenshots for $version" \
+      -m "Retake docs/screenshots from the $tag release in the macOS VM."
+    git push
+  fi
+else
+  echo "Screenshots failed; $tag is published. Fix the VM, then run ./scripts/screenshots.sh and commit docs/screenshots." >&2
+fi
 echo "Published $tag from $commit and updated the Homebrew tap; artifacts: $out"

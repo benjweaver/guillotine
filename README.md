@@ -100,7 +100,7 @@ the app and fake guard/helper tests, notarizes with the existing `notary`
 keychain profile, staples and verifies the app, and publishes the ZIP, source
 ZIP, and SHA-256 checksums to a GitHub release, then updates the Homebrew cask.
 Release notes come from that version’s changelog section. Logs and assets stay in `../../work`.
-After publishing, the script retakes `docs/screenshots/guillotine-menu.png` with `scripts/screenshots.sh` in the macOS VM and commits it; set `SKIP_SCREENSHOTS=1` to skip that.
+`docs/screenshots/guillotine-menu.png` is taken by hand on a MacBook, since a VM has no built-in panel; the script reminds you to retake it when the menu changes.
 
 The release script updates `benjweaver/homebrew-guillotine` directly after
 publishing, using the release archive and verified checksum. It does not change

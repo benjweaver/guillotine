@@ -75,6 +75,6 @@ if ! git -C "$tapdir" diff --quiet; then
   git -C "$tapdir" push
 fi
 # The README's menu shot is taken on a MacBook, where the panel control it describes is
-# real; the VM has no built-in panel, so scripts/screenshots.sh can't stand in for it.
+# real. A VM has no built-in panel, so its menu would show panel control as unavailable.
 echo "If the menu changed, retake docs/screenshots/guillotine-menu.png on a MacBook (⌘⇧4, Space, ⌥-click the open menu)."
 echo "Published $tag from $commit and updated the Homebrew tap; artifacts: $out"

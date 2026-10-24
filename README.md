@@ -3,9 +3,7 @@
 **Off with the head.** A native menu bar switch that powers off an Apple Silicon MacBook’s physical panel and keyboard backlight while retaining its logical display for remote access.
 
 <p align="center">
-  <img src="docs/screenshots/guillotine-menu.png" width="388" alt="Guillotine's menu: Enable Guillotine, Mute built-in speakers while headless, its status lines, Settings, Headless Setup & Limitations, and Quit.">
-  <br>
-  <sub>Taken in a virtual machine, which has no built-in panel, so panel control reads unavailable.</sub>
+  <img src="docs/screenshots/guillotine-menu.png" width="498" alt="Guillotine's menu on a MacBook running on battery: Enable Guillotine, Mute built-in speakers while headless (checked), status lines for battery, built-in panel power control, the closed-lid policy, battery sleep, Low Power Mode, and the disable shortcut, then Settings, Headless Setup & Limitations, and Quit.">
 </p>
 
 **Keep the lid open for the current supported workflow.** Enable Guillotine to turn off the panel and keyboard backlight, then use Caffeine independently if you want to prevent idle sleep. With the lid open, Guillotine immediately requests panel-off when macOS re-enables the built-in display; other display changes wait for the layout to settle. Panel power is not rewritten every second. No brightness-zero substitute is used for the panel.

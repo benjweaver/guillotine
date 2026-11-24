@@ -61,7 +61,7 @@ static NSArray *lastPanelEnableConfiguration;
 static id anchorDisplay;
 static NSTimer *panelReapplyTimer;
 static NSTimeInterval lastPanelOff;
-static BOOL systemSleeping;
+static BOOL systemSleeping, anchoring;
 static void emit(NSString *line) { puts(line.UTF8String); fflush(stdout); }
 static BOOL saveJournal(void) {
     if (![saved writeToFile:journal atomically:YES]) return NO;
@@ -274,8 +274,10 @@ static BOOL maintainControls(NSString **error) {
     enforcePolicy();
     if (!applyAudio(error)) return NO;
     if (closedLid || lowPowerBelow>0 || [saved[@"lidService"] boolValue]) {
+        // Journal ownership once, before the first call, not on every one-second renewal.
+        BOOL journaled=[saved[@"lidService"] boolValue];
         saved[@"lidService"]=@YES;
-        if (!saveJournal() || !lidServiceCall(NO,error)) {
+        if ((!journaled && !saveJournal()) || !lidServiceCall(NO,error)) {
             if (!*error) *error=@"Could not journal closed-lid helper ownership.";
             return NO;
         }
@@ -395,15 +397,32 @@ static BOOL createAnchorDisplay(void) {
     settings.modes=@[[[modeClass alloc] initWithWidth:1280 height:720 refreshRate:60]];
     if (![display applySettings:settings]) return NO;
     CGDirectDisplayID identifier=display.displayID;
+    BOOL listed=NO, asleep=NO;
+    // This process learns that a display woke only by handling WindowServer's
+    // notifications, which arrive through the event pump. Blocking here left
+    // the new display looking asleep for the whole wait, and left the app's
+    // lease renewals unread until the lease expired. Keep handling events.
+    anchoring=YES;
     for (int i=0;i<50;i++) {
         CGDirectDisplayID active[16]; uint32_t count=0;
+        listed=NO;
         if (CGGetActiveDisplayList(16,active,&count)==kCGErrorSuccess)
-            for (uint32_t j=0;j<count;j++) if (active[j]==identifier && !CGDisplayIsAsleep(identifier)) { anchorDisplay=display; return YES; }
-        [NSThread sleepForTimeInterval:0.1];
+            for (uint32_t j=0;j<count;j++) if (active[j]==identifier) listed=YES;
+        asleep=listed && CGDisplayIsAsleep(identifier);
+        if (listed && !asleep) { anchoring=NO; anchorDisplay=display; return YES; }
+        if (!NSApp) { [NSThread sleepForTimeInterval:0.1]; continue; }
+        NSDate *until=[NSDate dateWithTimeIntervalSinceNow:0.1];
+        NSEvent *event;
+        while ((event=[NSApp nextEventMatchingMask:NSEventMaskAny untilDate:until inMode:NSDefaultRunLoopMode dequeue:YES])) [NSApp sendEvent:event];
     }
+    anchoring=NO;
+    NSLog(@"Anchor display 0x%x was not usable after five seconds: listed=%d asleep=%d",identifier,listed,asleep);
     return NO;
 }
 static void reapplyPanelOff(NSString *reason) {
+    // A display event handled while the anchor is being created must not start
+    // a second one. The outer call decides from the state it finds afterward.
+    if (anchoring) return;
     if (!ready || finished || systemSleeping || !lidIsOpen()) return;
     if ([[NSFileManager defaultManager] fileExistsAtPath:restoreRequest]) {
         finish(0,@"Remote restoration requested");

@@ -2,6 +2,19 @@
 
 All notable changes are documented here using Keep a Changelog.
 
+## [1.0.5] - 2026-11-24
+
+### Fixed
+
+- Keep the session running and the built-in screen off when a remote stream disconnects and Guillotine has to create its anchor display mid-session. The hardware guard used to stop handling events while it waited for the new display, so the display looked asleep, the panel came back on, and the session ended with “Five-second lease expired”. Verified on hardware with test build 24.
+- Show errors in the menu. The error line was there but had no height, so it never appeared.
+- Show only the reason when the hardware guard refuses to start, without the internal “ERROR” prefix or a trailing status line.
+- Stop a hardware guard that hangs during startup and restore from its journal, instead of leaving it holding the session lock.
+
+### Changed
+
+- Record the power helper’s ownership in the restoration journal once per session instead of rewriting it every second.
+
 ## [1.0.4] - 2026-10-19
 
 ### Fixed

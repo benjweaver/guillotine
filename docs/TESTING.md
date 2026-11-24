@@ -2,6 +2,10 @@
 
 Host: MacBookPro18,1, macOS 27.0.1. Build 9 uses release Xcode 27, macOS 13 app deployment, and compiler warnings as errors. XCTest targets 14 to match the installed XCTest libraries. Intel hardware and minimum-OS runtime testing remain outstanding.
 
+## Mid-session anchor fix — 2026-11-24
+
+Host: macOS 27.2. Test build 23 (1.0.4 guard) failed with a stream connected before activation: on disconnect the guard created its anchor display, blocked for five seconds twice without handling WindowServer's notifications, powered the panel on, and stopped with "Five-second lease expired". WindowServer's log showed the anchor online within 30 ms and the guard timing out on `kCGSDisplayDidReconfigure2`. Ben confirmed that signed test build 24, which handles events during that wait, kept the built-in screen off after the same disconnect; its log shows the anchor accepted 0.45 seconds after creation and the session still running. Release 1.0.5 (build 25) includes the same guard change. 21 XCTest, 55 fake guard, and 21 fake helper cases pass; the fake hardware does not exercise the wait.
+
 ## Disconnect fix — 2026-10-19
 
 Ben confirmed that signed local test build 21 kept the built-in screen off after a remote stream disconnected. Release 1.0.4 (build 22) includes the same guard change.

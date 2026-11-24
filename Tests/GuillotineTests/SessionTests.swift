@@ -165,6 +165,12 @@ import Carbon
         next.refreshPower()
         XCTAssertFalse(next.enabled)
     }
+    func testGuardStartupFailureShowsTheReasonAlone() {
+        XCTAssertEqual(PhysicalControls.startupFailure(from: "ERROR Connect power.\n"), "Connect power.")
+        XCTAssertEqual(PhysicalControls.startupFailure(from: "ERROR No anchor display.\nSTOP Anchor display unavailable\n"), "No anchor display.")
+        XCTAssertEqual(PhysicalControls.startupFailure(from: ""), "Hardware guard did not become ready. Reopen Guillotine.")
+        XCTAssertEqual(PhysicalControls.startupFailure(from: "ERROR \n"), "Hardware guard did not become ready. Reopen Guillotine.")
+    }
     func testBatteryPolicyDefaultsAndBounds() {
         XCTAssertEqual(BatteryPolicy.defaultSleepPercentage, 10)
         XCTAssertEqual(BatteryPolicy.defaultLowPowerPercentage, 20)

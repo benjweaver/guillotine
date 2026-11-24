@@ -52,8 +52,14 @@ import Darwin
         let response = available > 0 ? String(data: output.fileHandleForReading.availableData, encoding: .utf8) ?? "" : ""
         guard response.hasPrefix("READY") else {
             input.fileHandleForWriting.closeFile()
-            _ = wait(child, seconds: 2)
-            throw failure(response.replacingOccurrences(of: "ERROR ", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Hardware guard did not become ready. Reopen Guillotine." : response)
+            if !wait(child, seconds: 2) {
+                // A guard that ignores its closed lease would keep the session lock, and
+                // possibly the panel, forever. Stop it and restore from its journal.
+                child.terminate()
+                _ = wait(child, seconds: 2)
+                try? recover()
+            }
+            throw failure(Self.startupFailure(from: response))
         }
         process = child
         lease = input.fileHandleForWriting
@@ -71,6 +77,14 @@ import Darwin
             }
         }
         if let heartbeat { RunLoop.main.add(heartbeat, forMode: .common) }
+    }
+    /// The guard reports a refused start as "ERROR <reason>", sometimes followed by a
+    /// "STOP <reason>" line once it has restored. Show the reason alone.
+    nonisolated static func startupFailure(from response: String) -> String {
+        let lines = response.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+        let reason = (lines.first { $0.hasPrefix("ERROR") }.map { String($0.dropFirst("ERROR".count)) } ?? lines.first ?? "")
+            .trimmingCharacters(in: .whitespaces)
+        return reason.isEmpty ? "Hardware guard did not become ready. Reopen Guillotine." : reason
     }
     func release() throws {
         heartbeat?.invalidate(); heartbeat = nil

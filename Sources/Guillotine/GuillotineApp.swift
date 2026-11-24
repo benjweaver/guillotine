@@ -122,7 +122,10 @@ import AppKit
         }
         if let error = session.error {
             let item = NSMenuItem()
-            item.view = NSHostingView(rootView: Text(error).font(.caption).foregroundStyle(.red).frame(width: 290, alignment: .leading).padding(10))
+            let view = NSHostingView(rootView: Text(error).font(.caption).foregroundStyle(.red).frame(width: 290, alignment: .leading).padding(10))
+            // A menu sizes a custom item from its view's frame, and a hosting view starts at zero.
+            view.frame = NSRect(origin: .zero, size: view.fittingSize)
+            item.view = view
             menu.addItem(item)
         }
         if !session.monitoringAvailable { add("Power notifications unavailable — reopen app", to: menu) }

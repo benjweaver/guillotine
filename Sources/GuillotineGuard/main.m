@@ -274,8 +274,10 @@ static BOOL maintainControls(NSString **error) {
     enforcePolicy();
     if (!applyAudio(error)) return NO;
     if (closedLid || lowPowerBelow>0 || [saved[@"lidService"] boolValue]) {
+        // Journal ownership once, before the first call, not on every one-second renewal.
+        BOOL journaled=[saved[@"lidService"] boolValue];
         saved[@"lidService"]=@YES;
-        if (!saveJournal() || !lidServiceCall(NO,error)) {
+        if ((!journaled && !saveJournal()) || !lidServiceCall(NO,error)) {
             if (!*error) *error=@"Could not journal closed-lid helper ownership.";
             return NO;
         }
